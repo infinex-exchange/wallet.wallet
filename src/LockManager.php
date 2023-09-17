@@ -220,7 +220,7 @@ class LockManager {
         $this -> pdo -> commit();
     }
     
-    public function release($body) {
+    public function commit($body) {
         if(!isset($body['lockId']))
             throw new RPCException('MISSING_DATA', 'lockId');
         if(!isset($body['reason']))
