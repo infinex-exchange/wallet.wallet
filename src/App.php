@@ -1,5 +1,6 @@
 <?php
 
+require __DIR__.'/WalletLog.php';
 require __DIR__.'/CreditDebit.php';
 require __DIR__.'/LockMgr.php';
 
@@ -10,6 +11,7 @@ use React\Promise;
 class App extends Infinex\App\App {
     private $pdo;
     
+    private $wlog;
     private $cd;
     private $locks;
     
@@ -28,16 +30,22 @@ class App extends Infinex\App\App {
             DB_NAME
         );
         
+        $this -> wlog = new WalletLog(
+            $this -> log
+        );
+        
         $this -> cd = new CreditDebit(
             $this -> log,
             $this -> amqp,
-            $this -> pdo
+            $this -> pdo,
+            $this -> wlog
         );
         
         $this -> lockMgr = new LockMgr(
             $this -> log,
             $this -> amqp,
-            $this -> pdo
+            $this -> pdo,
+            $this -> wlog
         );
         
         $this -> sessionsApi = new AssetsAPI(

@@ -6,11 +6,13 @@ class LockMgr {
     private $log;
     private $amqp;
     private $pdo;
+    private $wlog;
     
-    function __construct($log, $amqp, $pdo) {
+    function __construct($log, $amqp, $pdo, $wlog) {
         $this -> log = $log;
         $this -> amqp = $amqp;
         $this -> pdo = $pdo;
+        $this -> wlog = $wlog;
         
         $this -> log -> debug('Initialized locks manager');
     }
@@ -21,9 +23,9 @@ class LockMgr {
         $promises = [];
         
         $promises[] = $this -> amqp -> method(
-            'credit',
+            'simpleLock',
             function($body) use($th) {
-                return $th -> credit(
+                return $th -> simpleLock(
                     $body['uid'],
                     $body['assetid'],
                     $body['amount'],
@@ -34,12 +36,21 @@ class LockMgr {
         );
         
         $promises[] = $this -> amqp -> method(
-            'debit',
+            'simpleRelease',
             function($body) use($th) {
-                return $th -> debit(
-                    $body['uid'],
-                    $body['assetid'],
-                    $body['amount'],
+                return $th -> simpleRelease(
+                    $body['lockid'],
+                    $body['reason'],
+                    $body['context']
+                );
+            }
+        );
+        
+        $promises[] = $this -> amqp -> method(
+            'simpleCommit',
+            function($body) use($th) {
+                return $th -> simpleCommit(
+                    $body['lockid'],
                     $body['reason'],
                     $body['context']
                 );
@@ -77,7 +88,7 @@ class LockMgr {
         );
     }
     
-    public function lock($uid, $assetid, $amount, $reason, $context) {
+    public function simpleLock($uid, $assetid, $amount, $reason, $context) {
         $this -> pdo -> beginTransaction();
         
         $task = array(
@@ -100,7 +111,7 @@ class LockMgr {
             
         if(!$row) {
             $this -> pdo -> rollBack();
-            throw new RPCException('INSUF_BALANCE', 'Insufficient balance to create a lock');
+            throw new Error('INSUF_BALANCE', 'Insufficient account balance', 400);
         }
         
         $task = array(
@@ -111,69 +122,52 @@ class LockMgr {
             ':contextid' => $body['contextId']
         );
         
-        $sql = 'INSERT INTO wallet_locks(
+        $sql = "INSERT INTO wallet_locks(
                     uid,
+                    type,
                     assetid,
                     amount
                 )
                 VALUES(
                     :uid,
+                    'SIMPLE',
                     :assetid,
                     :amount
                 )
-                RETURNING lockid';
+                RETURNING lockid";
         
         $q = $this -> pdo -> prepare($sql);
         $q -> execute($task);
         $row = $q -> fetch();
-        $lockId = $row['lockid'];
+        $lockid = $row['lockid'];
         
-        $task = array(
-            ':lockid' => $lockId,
-            ':uid' => $body['uid'],
-            ':assetid' => $body['assetid'],
-            ':amount' => $body['amount'],
-            ':reason' => $body['reason'],
-            ':contextid' => $body['contextId']
+        $this -> wlog -> insert(
+            $this -> pdo,
+            'SIMPLE_LOCK',
+            $lockid,
+            $uid,
+            $assetid,
+            $amount,
+            $reason,
+            $context
         );
-        
-        $sql = "INSERT INTO wallet_log(
-                    operation,
-                    lockid,
-                    uid,
-                    assetid,
-                    amount,
-                    reason,
-                    contextid
-                )
-                VALUES(
-                    'LOCK',
-                    :lockid,
-                    :uid,
-                    :assetid,
-                    :amount,
-                    :reason,
-                    :contextid
-                )";
-        
-        $q = $this -> pdo -> prepare($sql);
-        $q -> execute($task);
         
         $this -> pdo -> commit();
             
-        return $lockId;
+        return $lockid;
     }
     
-    public function release($lockId, $reason, $context) {
+    public function simpleRelease($lockid, $reason, $context) {
         $this -> pdo -> beginTransaction();
         
         $task = array(
-            ':lockId' => $body['lockId']
+            ':lockid' => $body['lockid']
         );
         
-        $sql = 'DELETE FROM wallet_locks
+        $sql = "DELETE FROM wallet_locks
                 WHERE lockid = :lockid
-                RETURNING uid, assetid, amount';
+                AND type = 'SIMPLE'
+                RETURNING uid, assetid, amount";
         
         $q = $this -> pdo -> prepare($sql);
         $q -> execute($task);
@@ -181,7 +175,7 @@ class LockMgr {
             
         if(!$lock) {
             $this -> pdo -> rollBack();
-            throw new RPCException('LOCK_NOT_FOUND', 'Lock '.$body['lockId'].' not found');
+            throw new Error('NOT_FOUND', "Lock $lockid not found");
         }
         
         $task = array(
@@ -204,53 +198,34 @@ class LockMgr {
         
         if(!$row) {
             $this -> pdo -> rollBack();
-            throw new RPCException('DATA_INTEGRITY_ERROR', 'No balance entry or locked balance < release amount');
+            throw new Error('DATA_INTEGRITY_ERROR', 'No balance entry or locked balance < release amount');
         }
         
-        $task = array(
-            ':lockid' => $body['lockId'],
-            ':uid' => $lock['uid'],
-            ':assetid' => $lock['assetid'],
-            ':amount' => $lock['amount'],
-            ':reason' => $body['reason'],
-            ':contextid' => $body['contextId']
+        $this -> wlog -> insert(
+            $this -> pdo,
+            'SIMPLE_RELEASE',
+            $lockid,
+            $lock['uid'],
+            $lock['assetid'],
+            $lock['amount'],
+            $reason,
+            $context
         );
-        
-        $sql = "INSERT INTO wallet_log(
-                    operation,
-                    lockid,
-                    uid,
-                    assetid,
-                    amount,
-                    reason,
-                    contextid
-                )
-                VALUES(
-                    'RELEASE',
-                    :lockid,
-                    :uid,
-                    :assetid,
-                    :amount,
-                    :reason,
-                    :contextid
-                )";
-        
-        $q = $this -> pdo -> prepare($sql);
-        $q -> execute($task);
         
         $this -> pdo -> commit();
     }
     
-    public function commit($lockId, $reason, $context) {
+    public function simpleCommit($lockid, $reason, $context) {
         $this -> pdo -> beginTransaction();
         
         $task = array(
-            ':lockId' => $body['lockId']
+            ':lockid' => $body['lockid']
         );
         
-        $sql = 'DELETE FROM wallet_locks
+        $sql = "DELETE FROM wallet_locks
                 WHERE lockid = :lockid
-                RETURNING uid, assetid, amount';
+                AND type = 'SIMPLE'
+                RETURNING uid, assetid, amount";
         
         $q = $this -> pdo -> prepare($sql);
         $q -> execute($task);
@@ -258,7 +233,7 @@ class LockMgr {
             
         if(!$lock) {
             $this -> pdo -> rollBack();
-            throw new RPCException('LOCK_NOT_FOUND', 'Lock '.$body['lockId'].' not found');
+            throw new Error('NOT_FOUND', "Lock $lockid not found");
         }
         
         $task = array(
@@ -283,39 +258,19 @@ class LockMgr {
         
         if(!$row) {
             $this -> pdo -> rollBack();
-            throw new RPCException('DATA_INTEGRITY_ERROR', 'No balance entry or locked balance < commit amount');
+            throw new Error('DATA_INTEGRITY_ERROR', 'No balance entry or locked balance < commit amount');
         }
         
-        $task = array(
-            ':lockid' => $body['lockId'],
-            ':uid' => $lock['uid'],
-            ':assetid' => $lock['assetid'],
-            ':amount' => $lock['amount'],
-            ':reason' => $body['reason'],
-            ':contextid' => $body['contextId']
+        $this -> wlog -> insert(
+            $this -> pdo,
+            'SIMPLE_COMMIT',
+            $lockid,
+            $lock['uid'],
+            $lock['assetid'],
+            $lock['amount'],
+            $reason,
+            $context
         );
-        
-        $sql = "INSERT INTO wallet_log(
-                    operation,
-                    lockid,
-                    uid,
-                    assetid,
-                    amount,
-                    reason,
-                    contextid
-                )
-                VALUES(
-                    'COMMIT',
-                    :lockid,
-                    :uid,
-                    :assetid,
-                    :amount,
-                    :reason,
-                    :contextid
-                )";
-        
-        $q = $this -> pdo -> prepare($sql);
-        $q -> execute($task);
         
         $this -> pdo -> commit();
     }

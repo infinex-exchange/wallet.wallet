@@ -1,6 +1,6 @@
 CREATE EXTENSION IF NOT EXISTS timescaledb;
 
-CREATE ROLE walletd LOGIN PASSWORD 'password';
+CREATE ROLE "wallet.wallet" LOGIN PASSWORD 'password';
 
 create table assets(
     assetid varchar(32) not null primary key,
@@ -9,7 +9,7 @@ create table assets(
     experimental boolean not null default FALSE
 );
 
-GRANT SELECT ON assets TO walletd;
+GRANT SELECT ON assets TO "wallet.wallet";
 
 create table wallet_balances(
     uid bigint not null,
@@ -20,10 +20,11 @@ create table wallet_balances(
     foreign key(assetid) references assets(assetid)
 );
 
-GRANT SELECT, UPDATE, INSERT ON wallet_balances TO walletd;
+GRANT SELECT, UPDATE, INSERT ON wallet_balances TO "wallet.wallet";
 
 create table wallet_locks(
     lockid bigserial not null primary key,
+    type varchar(32) not null,
     uid bigint not null,
     assetid varchar(32) not null,
     amount decimal(65, 32) not null,
@@ -31,7 +32,7 @@ create table wallet_locks(
     foreign key(assetid) references assets(assetid)
 );
 
-GRANT SELECT, INSERT, DELETE ON wallet_balances TO walletd;
+GRANT SELECT, INSERT, DELETE ON wallet_balances TO "wallet.wallet";
 
 create table wallet_log(
     time timestamptz not null default current_timestamp,
@@ -41,11 +42,11 @@ create table wallet_log(
     assetid varchar(32) not null,
     amount decimal(65, 32) not null,
     reason varchar(64) not null,
-    contextid varchar(255) not null,
+    context varchar(255) not null,
     
     foreign key(assetid) references assets(assetid)
 );
 SELECT create_hypertable('wallet_log', 'time');
-SELECT add_retention_policy('wallet_log', INTERVAL '1 month');
+SELECT add_retention_policy('wallet_log', INTERVAL '2 years');
 
-GRANT INSERT ON wallet_log TO walletd;
+GRANT INSERT ON wallet_log TO "wallet.wallet";

@@ -7,11 +7,13 @@ class CreditDebit {
     private $log;
     private $amqp;
     private $pdo;
+    private $wlog;
     
-    function __construct($log, $amqp, $pdo) {
+    function __construct($log, $amqp, $pdo, $wlog) {
         $this -> log = $log;
         $this -> amqp = $amqp;
         $this -> pdo = $pdo;
+        $this -> wlog = $wlog;
         
         $this -> log -> debug('Initialized credit / debit');
     }
@@ -113,33 +115,16 @@ class CreditDebit {
             $q -> execute($task);
         }
         
-        $task = array(
-            ':uid' => $uid,
-            ':assetid' => $assetid,
-            ':amount' => $amount,
-            ':reason' => $reason,
-            ':context' => $context
+        $this -> wlog -> insert(
+            $this -> pdo,
+            'CREDIT',
+            null,
+            $uid,
+            $assetid,
+            $amount,
+            $reason,
+            $context
         );
-        
-        $sql = "INSERT INTO wallet_log(
-                    operation,
-                    uid,
-                    assetid,
-                    amount,
-                    reason,
-                    context
-                )
-                VALUES(
-                    'CREDIT',
-                    :uid,
-                    :assetid,
-                    :amount,
-                    :reason,
-                    :context
-                )";
-        
-        $q = $this -> pdo -> prepare($sql);
-        $q -> execute($task);
         
         $this -> pdo -> commit();
     }
@@ -167,36 +152,19 @@ class CreditDebit {
             
         if(!$row) {
             $this -> pdo -> rollBack();
-            throw new Error('INSUF_BALANCE', 'Insufficient balance to debit');
+            throw new Error('INSUF_BALANCE', 'Insufficient account balance', 400);
         }
         
-        $task = array(
-            ':uid' => $uid,
-            ':assetid' => $assetid,
-            ':amount' => $amount,
-            ':reason' => $reason,
-            ':context' => $context
+        $this -> wlog -> insert(
+            $this -> pdo,
+            'DEBIT',
+            null,
+            $uid,
+            $assetid,
+            $amount,
+            $reason,
+            $context
         );
-        
-        $sql = "INSERT INTO wallet_log(
-                    operation,
-                    uid,
-                    assetid,
-                    amount,
-                    reason,
-                    context
-                )
-                VALUES(
-                    'DEBIT',
-                    :uid,
-                    :assetid,
-                    :amount,
-                    :reason,
-                    :context
-                )";
-        
-        $q = $this -> pdo -> prepare($sql);
-        $q -> execute($task);
         
         $this -> pdo -> commit();
     }
