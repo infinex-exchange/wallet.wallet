@@ -283,7 +283,10 @@ class LockMgr {
         
         $this -> pdo -> commit();
             
-        return $lockid;
+        return [
+            'lockid' => $lockid,
+            'amount' => $amount
+        ];
     }
     
     public function delayedRelease($lockid, $reason, $context) {
