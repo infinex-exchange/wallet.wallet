@@ -1,55 +1,83 @@
 <?php
+use Infinex\Exceptions\Error;
+use React\Promise;
 
-use Infinex\AMQP\RPCException;
-
-class LockManager {
+class LockMgr {
     private $log;
+    private $amqp;
     private $pdo;
     
-    function __construct($log, $pdo) {
+    function __construct($log, $amqp, $pdo) {
         $this -> log = $log;
+        $this -> amqp = $amqp;
         $this -> pdo = $pdo;
         
-        $this -> log -> debug('Initialized balance lock manager');
+        $this -> log -> debug('Initialized locks manager');
     }
     
-    public function bind($amqp) {
+    public function start() {
         $th = $this;
         
-        $amqp -> method(
-            'wallet_lock',
+        $promises = [];
+        
+        $promises[] = $this -> amqp -> method(
+            'credit',
             function($body) use($th) {
-                return $th -> lock($body);
+                return $th -> credit(
+                    $body['uid'],
+                    $body['assetid'],
+                    $body['amount'],
+                    $body['reason'],
+                    $body['context']
+                );
             }
         );
         
-        $amqp -> method(
-            'wallet_release',
+        $promises[] = $this -> amqp -> method(
+            'debit',
             function($body) use($th) {
-                return $th -> release($body);
+                return $th -> debit(
+                    $body['uid'],
+                    $body['assetid'],
+                    $body['amount'],
+                    $body['reason'],
+                    $body['context']
+                );
             }
         );
         
-        $amqp -> method(
-            'wallet_commit',
-            function($body) use($th) {
-                return $th -> commit($body);
+        return Promise\all($promises) -> then(
+            function() use($th) {
+                $th -> log -> info('Started locks manager');
+            }
+        ) -> catch(
+            function($e) use($th) {
+                $th -> log -> error('Failed to start locks manager: '.((string) $e));
+                throw $e;
             }
         );
     }
     
-    public function lock($body) {
-        if(!isset($body['uid']))
-            throw new RPCException('MISSING_DATA', 'uid');
-        if(!isset($body['assetid']))
-            throw new RPCException('MISSING_DATA', 'assetid');
-        if(!isset($body['amount']))
-            throw new RPCException('MISSING_DATA', 'amount');
-        if(!isset($body['reason']))
-            throw new RPCException('MISSING_DATA', 'reason');
-        if(!isset($body['contextId']))
-            throw new RPCException('MISSING_DATA', 'contextId');
+    public function stop() {
+        $th = $this;
         
+        $promises = [];
+        
+        $promises[] = $this -> amqp -> unreg('credit');
+        $promises[] = $this -> amqp -> unreg('debit');
+        
+        return Promise\all($promises) -> then(
+            function() use ($th) {
+                $th -> log -> info('Stopped locks manager');
+            }
+        ) -> catch(
+            function($e) use($th) {
+                $th -> log -> error('Failed to stop locks manager: '.((string) $e));
+            }
+        );
+    }
+    
+    public function lock($uid, $assetid, $amount, $reason, $context) {
         $this -> pdo -> beginTransaction();
         
         $task = array(
@@ -136,14 +164,7 @@ class LockManager {
         return $lockId;
     }
     
-    public function release($body) {
-        if(!isset($body['lockId']))
-            throw new RPCException('MISSING_DATA', 'lockId');
-        if(!isset($body['reason']))
-            throw new RPCException('MISSING_DATA', 'reason');
-        if(!isset($body['contextId']))
-            throw new RPCException('MISSING_DATA', 'contextId');
-        
+    public function release($lockId, $reason, $context) {
         $this -> pdo -> beginTransaction();
         
         $task = array(
@@ -220,14 +241,7 @@ class LockManager {
         $this -> pdo -> commit();
     }
     
-    public function commit($body) {
-        if(!isset($body['lockId']))
-            throw new RPCException('MISSING_DATA', 'lockId');
-        if(!isset($body['reason']))
-            throw new RPCException('MISSING_DATA', 'reason');
-        if(!isset($body['contextId']))
-            throw new RPCException('MISSING_DATA', 'contextId');
-        
+    public function commit($lockId, $reason, $context) {
         $this -> pdo -> beginTransaction();
         
         $task = array(
