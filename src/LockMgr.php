@@ -155,9 +155,7 @@ class LockMgr {
             'SIMPLE',
             $uid,
             $asset,
-            $amount,
-            $reason,
-            $context
+            $amount
         );
         
         $this -> wlog -> insert(
@@ -284,9 +282,7 @@ class LockMgr {
             'DELAYED',
             $uid,
             $asset,
-            $amount,
-            $reason,
-            $context
+            $amount
         );
         
         $this -> wlog -> insert(
@@ -388,14 +384,12 @@ class LockMgr {
         $this -> pdo -> commit();
     }
     
-    private function insertLock($tPdo, $type, $uid, $assetid, $amount, $reason, $context) {
+    private function insertLock($tPdo, $type, $uid, $assetid, $amount) {
         $task = array(
             ':uid' => $uid,
             ':type' => $type,
             ':assetid' => $assetid,
-            ':amount' => $amount,
-            ':reason' => $reason,
-            ':context' => $context
+            ':amount' => $amount
         );
         
         $sql = 'INSERT INTO wallet_locks(
