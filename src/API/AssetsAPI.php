@@ -24,8 +24,8 @@ class AssetsAPI {
         $pag = new Pagination\Offset(50, 500, $query);
         $search = new Search(
             [
-                'assetid',
-                'name'
+                'assets.assetid',
+                'assets.name'
             ],
             $query
         );
@@ -33,14 +33,16 @@ class AssetsAPI {
         $task = [];
         $search -> updateTask($task);
         
-        $sql = 'SELECT assetid,
-                       name,
-                       icon_url,
-                       experimental
-                FROM assets
+        $sql = 'SELECT assets.assetid,
+                       assets.name,
+                       assets.icon_url,
+                       assets.experimental,
+                       MAX(asset_network.prec) AS max_prec
+                FROM assets,
+                     asset_network
                 WHERE 1=1'
              . $search -> sql()
-             . ' ORDER BY assetid ASC'
+             . ' ORDER BY assets.assetid ASC'
              . $pag -> sql();
         
         $q = $this -> pdo -> prepare($sql);
@@ -55,7 +57,7 @@ class AssetsAPI {
                 'symbol' => $row['assetid'],
                 'name' => $row['name'],
                 'iconUrl' => $row['icon_url'],
-                'maxPrec' => $this -> getMaxPrec($row['assetid']),
+                'maxPrec' => $row['max_prec'],
                 'experimental' => $row['experimental']
             ];
         }
