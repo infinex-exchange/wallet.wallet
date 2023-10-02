@@ -39,7 +39,7 @@ class WalletLog {
                     contextid
                 )
                 VALUES(
-                    :op,
+                    :operation,
                     :lockid,
                     :uid,
                     :assetid,

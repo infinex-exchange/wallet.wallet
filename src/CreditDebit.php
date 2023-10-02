@@ -28,10 +28,10 @@ class CreditDebit {
             function($body) use($th) {
                 return $th -> credit(
                     $body['uid'],
-                    $body['assetid'],
+                    $body['asset'],
                     $body['amount'],
                     $body['reason'],
-                    $body['context']
+                    isset($body['context']) ? $body['context'] : null
                 );
             }
         );
@@ -41,10 +41,10 @@ class CreditDebit {
             function($body) use($th) {
                 return $th -> debit(
                     $body['uid'],
-                    $body['assetid'],
+                    $body['asset'],
                     $body['amount'],
                     $body['reason'],
-                    $body['context']
+                    isset($body['context']) ? $body['context'] : null
                 );
             }
         );
@@ -80,12 +80,12 @@ class CreditDebit {
         );
     }
     
-    public function credit($uid, $assetid, $amount, $reason, $context) {
+    public function credit($uid, $asset, $amount, $reason, $context) {
         $this -> pdo -> beginTransaction();
         
         $task = array(
             ':uid' => $uid,
-            ':assetid' => $assetid,
+            ':assetid' => $asset,
             ':amount' => $amount
         );
         
@@ -120,7 +120,7 @@ class CreditDebit {
             'CREDIT',
             null,
             $uid,
-            $assetid,
+            $asset,
             $amount,
             $reason,
             $context
@@ -129,12 +129,12 @@ class CreditDebit {
         $this -> pdo -> commit();
     }
     
-    public function debit($uid, $assetid, $amount, $reason, $context) {
+    public function debit($uid, $asset, $amount, $reason, $context) {
         $this -> pdo -> beginTransaction();
         
         $task = array(
             ':uid' => $uid,
-            ':assetid' => $assetid,
+            ':assetid' => $asset,
             ':amount' => $amount,
             ':amount2' => $amount
         );
@@ -160,7 +160,7 @@ class CreditDebit {
             'DEBIT',
             null,
             $uid,
-            $assetid,
+            $asset,
             $amount,
             $reason,
             $context
