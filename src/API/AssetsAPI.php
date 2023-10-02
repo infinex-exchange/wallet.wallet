@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__.'/validate.php';
+
 use Infinex\Exceptions\Error;
 use Infinex\Pagination;
 use Infinex\Database\Search;
@@ -66,6 +68,40 @@ class AssetsAPI {
         return [
             'assets' => $assets,
             'more' => $pag -> more
+        ];
+    }
+    
+    public function getAsset($path, $query, $body, $auth) {
+        if(!validateAssetSymbol($path['symbol']))
+            throw new Error('VALIDATION_ERROR', 'symbol', 400);
+        
+        $task = [
+            ':symbol' => $path['symbol']
+        ];
+        
+        $sql = 'SELECT assets.assetid,
+                       assets.name,
+                       assets.icon_url,
+                       assets.experimental,
+                       MAX(asset_network.prec) AS max_prec
+                FROM assets,
+                     asset_network
+                WHERE asset_network.assetid = assets.assetid
+                AND assets.assetid = :symbol';
+        
+        $q = $this -> pdo -> prepare($sql);
+        $q -> execute($task);
+        $row = $q -> fetch();
+        
+        if(!$row)
+            throw new Error('NOT_FOUND', 'Asset '.$path['symbol'].' not found', 404);
+        
+        return [
+            'symbol' => $row['assetid'],
+            'name' => $row['name'],
+            'iconUrl' => $row['icon_url'],
+            'maxPrec' => $row['max_prec'],
+            'experimental' => $row['experimental']
         ];
     }
 }
