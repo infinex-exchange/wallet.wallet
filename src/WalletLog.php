@@ -3,7 +3,7 @@
 class WalletLog {
     private $log;
     
-    function __construct($log, $amqp, $pdo) {
+    function __construct($log) {
         $this -> log = $log;
         
         $this -> log -> debug('Initialized wallet log');
