@@ -21,7 +21,7 @@ class AssetsAPI {
     }
     
     public function getAllAssets($path, $query, $body, $auth) {
-        $pag = new Pagination\Offset(50, 500, $query);
+        /*$pag = new Pagination\Offset(50, 500, $query);
         
         $task = [];
         
@@ -58,7 +58,7 @@ class AssetsAPI {
         return [
             'sessions' => $sessions,
             'more' => $pag -> more
-        ];
+        ];*/
     }
 }
 
