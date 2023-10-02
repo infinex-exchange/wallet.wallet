@@ -48,7 +48,7 @@ class App extends Infinex\App\App {
             $this -> wlog
         );
         
-        $this -> sessionsApi = new AssetsAPI(
+        $this -> assetsApi = new AssetsAPI(
             $this -> log,
             $this -> pdo
         );
