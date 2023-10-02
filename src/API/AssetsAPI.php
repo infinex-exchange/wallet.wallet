@@ -5,12 +5,10 @@ use Infinex\Pagination;
 
 class AssetsAPI {
     private $log;
-    private $amqp;
     private $pdo;
     
-    function __construct($log, $amqp, $pdo) {
+    function __construct($log, $pdo) {
         $this -> log = $log;
-        $this -> amqp = $amqp;
         $this -> pdo = $pdo;
         
         $this -> log -> debug('Initialized assets API');
