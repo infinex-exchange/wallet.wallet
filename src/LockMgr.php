@@ -322,13 +322,10 @@ class LockMgr {
             ':lockid' => $lockid
         );
         
-        $sql = "SELECT uid,
-                       assetid,
-                       amount
-                FROM wallet_locks
+        $sql = "DELETE FROM wallet_locks
                 WHERE lockid = :lockid
-                AND type = 'DELAYED'
-                FOR UPDATE";
+                AND type = 'SIMPLE'
+                RETURNING uid, assetid, amount";
         
         $q = $this -> pdo -> prepare($sql);
         $q -> execute($task);
