@@ -42,7 +42,8 @@ class AssetsAPI {
                      asset_network
                 WHERE 1=1'
              . $search -> sql()
-             . ' ORDER BY assets.assetid ASC'
+             .' GROUP BY assets.assetid
+                ORDER BY assets.assetid ASC'
              . $pag -> sql();
         
         $q = $this -> pdo -> prepare($sql);
