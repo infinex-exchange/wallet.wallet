@@ -32,7 +32,7 @@ create table wallet_locks(
     foreign key(assetid) references assets(assetid)
 );
 
-GRANT SELECT, INSERT, DELETE ON wallet_balances TO "wallet.wallet";
+GRANT SELECT, INSERT, DELETE ON wallet_locks TO "wallet.wallet";
 
 create table wallet_log(
     time timestamptz not null default current_timestamp,
