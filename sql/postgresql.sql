@@ -42,7 +42,7 @@ create table wallet_log(
     assetid varchar(32) not null,
     amount decimal(65, 32) not null,
     reason varchar(64) not null,
-    context varchar(255) not null,
+    context varchar(255) default null,
     
     foreign key(assetid) references assets(assetid)
 );
