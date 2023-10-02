@@ -87,7 +87,8 @@ class AssetsAPI {
                 FROM assets,
                      asset_network
                 WHERE asset_network.assetid = assets.assetid
-                AND assets.assetid = :symbol';
+                AND assets.assetid = :symbol
+                GROUP BY assets.assetid';
         
         $q = $this -> pdo -> prepare($sql);
         $q -> execute($task);
