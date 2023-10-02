@@ -40,7 +40,7 @@ class AssetsAPI {
                        MAX(asset_network.prec) AS max_prec
                 FROM assets,
                      asset_network
-                WHERE 1=1'
+                WHERE asset_network.assetid = assets.assetid'
              . $search -> sql()
              .' GROUP BY assets.assetid
                 ORDER BY assets.assetid ASC'
