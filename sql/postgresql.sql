@@ -33,6 +33,7 @@ create table wallet_locks(
 );
 
 GRANT SELECT, INSERT, DELETE ON wallet_locks TO "wallet.wallet";
+GRANT SELECT, USAGE ON wallet_locks_lockid_seq TO "wallet.wallet";
 
 create table wallet_log(
     time timestamptz not null default current_timestamp,
