@@ -1,6 +1,7 @@
 <?php
 use Infinex\Exceptions\Error;
 use React\Promise;
+use Decimal\Decimal;
 
 class LockMgr {
     private $log;
@@ -60,7 +61,7 @@ class LockMgr {
         $promises[] = $this -> amqp -> method(
             'delayedLock',
             function($body) use($th) {
-                return $th -> simpleLock(
+                return $th -> delayedLock(
                     $body['uid'],
                     $body['assetid'],
                     $body['reason'],
@@ -72,7 +73,7 @@ class LockMgr {
         $promises[] = $this -> amqp -> method(
             'delayedRelease',
             function($body) use($th) {
-                return $th -> simpleRelease(
+                return $th -> delayedRelease(
                     $body['lockid'],
                     $body['reason'],
                     $body['context']
@@ -83,7 +84,7 @@ class LockMgr {
         $promises[] = $this -> amqp -> method(
             'delayedCommit',
             function($body) use($th) {
-                return $th -> simpleCommit(
+                return $th -> delayedCommit(
                     $body['lockid'],
                     $body['amount'],
                     $body['reason'],
@@ -149,7 +150,7 @@ class LockMgr {
             throw new Error('INSUF_BALANCE', 'Insufficient account balance', 400);
         }
         
-        $lockId = $this -> insertLock(
+        $lockid = $this -> insertLock(
             $this -> pdo,
             'SIMPLE',
             $uid,
@@ -161,7 +162,7 @@ class LockMgr {
         
         $this -> wlog -> insert(
             $this -> pdo,
-            'LOCK',
+            'LOCK_SIMPLE',
             $lockid,
             $uid,
             $assetid,
@@ -219,7 +220,7 @@ class LockMgr {
                 WHERE uid = :uid
                 AND assetid = :assetid
                 AND locked >= :amount3
-                RETURNING uid';
+                RETURNING 1';
         
         $q = $this -> pdo -> prepare($sql);
         $q -> execute($task);
@@ -232,7 +233,7 @@ class LockMgr {
         
         $this -> wlog -> insert(
             $this -> pdo,
-            'COMMIT',
+            'COMMIT_SIMPLE',
             $lockid,
             $lock['uid'],
             $lock['assetid'],
@@ -278,36 +279,19 @@ class LockMgr {
         }
         $amount = $row['avbl'];
         
-        $task = array(
-            ':uid' => $uid,
-            ':assetid' => $assetid,
-            ':amount' => $amount,
-            ':reason' => $reason,
-            ':context' => $context
+        $lockid = $this -> insertLock(
+            $this -> pdo,
+            'DELAYED',
+            $uid,
+            $assetid,
+            $amount,
+            $reason,
+            $context
         );
-        
-        $sql = "INSERT INTO wallet_locks(
-                    uid,
-                    type,
-                    assetid,
-                    amount
-                )
-                VALUES(
-                    :uid,
-                    'DELAYED',
-                    :assetid,
-                    :amount
-                )
-                RETURNING lockid";
-        
-        $q = $this -> pdo -> prepare($sql);
-        $q -> execute($task);
-        $row = $q -> fetch();
-        $lockid = $row['lockid'];
         
         $this -> wlog -> insert(
             $this -> pdo,
-            'LOCK',
+            'LOCK_DELAYED',
             $lockid,
             $uid,
             $assetid,
@@ -333,8 +317,75 @@ class LockMgr {
         );
     }
     
-    public function delayedCommit($lockid, $reason, $context) {
-        //
+    public function delayedCommit($lockid, $amount, $reason, $context) {
+        $dAmount = new Decimal($amount);
+        
+        $this -> pdo -> beginTransaction();
+        
+        $task = array(
+            ':lockid' => $lockid
+        );
+        
+        $sql = "SELECT uid,
+                       assetid,
+                       amount
+                FROM wallet_locks
+                WHERE lockid = :lockid
+                AND type = 'DELAYED'
+                FOR UPDATE";
+        
+        $q = $this -> pdo -> prepare($sql);
+        $q -> execute($task);
+        $lock = $q -> fetch();
+            
+        if(!$lock) {
+            $this -> pdo -> rollBack();
+            throw new Error('NOT_FOUND', "Lock $lockid not found");
+        }
+        
+        $dLockAmount = new Decimal($lock['amount']);
+        if($dAmount > $dLockAmount) {
+            $this -> pdo -> rollBack();
+            throw new Error('OUT_OF_RANGE', "Commit amount > lock amount");
+        }
+        
+        $task = array(
+            ':uid' => $lock['uid'],
+            ':assetid' => $lock['assetid'],
+            ':lock_amount' => $lock['amount'],
+            ':lock_amount2' => $lock['amount'],
+            ':commit_amount' => $amount
+        );
+        
+        $sql = 'UPDATE wallet_balances
+                SET locked = locked - :lock_amount,
+                    total = total - :commit_amount
+                WHERE uid = :uid
+                AND assetid = :assetid
+                AND locked >= :lock_amount2
+                RETURNING 1';
+        
+        $q = $this -> pdo -> prepare($sql);
+        $q -> execute($task);
+        $row = $q -> fetch();
+        
+        if(!$row) {
+            $this -> pdo -> rollBack();
+            throw new Error('DATA_INTEGRITY_ERROR', 'No balance entry or locked balance < commit amount');
+        }
+        
+        $this -> wlog -> insert(
+            $this -> pdo,
+            'COMMIT_DELAYED',
+            $lockid,
+            $lock['uid'],
+            $lock['assetid'],
+            $amount,
+            $reason,
+            $context
+        );
+        
+        $this -> pdo -> commit();
     }
     
     private function insertLock($tPdo, $type, $uid, $assetid, $amount, $reason, $context) {
@@ -415,7 +466,7 @@ class LockMgr {
         
         $this -> wlog -> insert(
             $this -> pdo,
-            'RELEASE',
+            'RELEASE_'.$type,
             $lockid,
             $lock['uid'],
             $lock['assetid'],
