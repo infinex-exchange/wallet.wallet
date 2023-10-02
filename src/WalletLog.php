@@ -26,7 +26,7 @@ class WalletLog {
             ':assetid' => $assetid,
             ':amount' => $amount,
             ':reason' => $reason,
-            ':contextid' => $context
+            ':context' => $context
         );
         
         $sql = "INSERT INTO wallet_log(
@@ -36,7 +36,7 @@ class WalletLog {
                     assetid,
                     amount,
                     reason,
-                    contextid
+                    context
                 )
                 VALUES(
                     :operation,
@@ -45,7 +45,7 @@ class WalletLog {
                     :assetid,
                     :amount,
                     :reason,
-                    :contextid
+                    :context
                 )";
         
         $q = $tPdo -> prepare($sql);
