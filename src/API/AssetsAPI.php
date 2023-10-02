@@ -2,6 +2,7 @@
 
 use Infinex\Exceptions\Error;
 use Infinex\Pagination;
+use Infinex\Database\Search;
 
 class AssetsAPI {
     private $log;
@@ -16,47 +17,53 @@ class AssetsAPI {
     
     public function initRoutes($rc) {
         $rc -> get('/assets', [$this, 'getAllAssets']);
+        $rc -> get('/assets/{symbol}', [$this, 'getAsset']);
     }
     
     public function getAllAssets($path, $query, $body, $auth) {
-        /*$pag = new Pagination\Offset(50, 500, $query);
+        $pag = new Pagination\Offset(50, 500, $query);
+        $search = new Search(
+            [
+                'assetid',
+                'name'
+            ],
+            $query
+        );
         
         $task = [];
+        $search -> updateTask($task);
         
-        $sql = "SELECT sid,
-                       wa_remember,
-                       EXTRACT(epoch FROM wa_lastact) AS wa_lastact,
-                       wa_browser,
-                       wa_os,
-                       wa_device
-               FROM sessions
-               WHERE uid = :uid
-               AND origin = 'WEBAPP'
-               ORDER BY sid DESC"
+        $sql = 'SELECT assetid,
+                       name,
+                       icon_url,
+                       experimental
+                FROM assets
+                WHERE 1=1'
+             . $search -> sql()
+             . ' ORDER BY assetid ASC'
              . $pag -> sql();
         
         $q = $this -> pdo -> prepare($sql);
         $q -> execute($task);
         
-        $sessions = [];
+        $assets = [];
         
         while($row = $q -> fetch()) {
             if($pag -> iter()) break;
             
-            $sessions[] = [
-                'sid' => $row['sid'],
-                'lastAct' => $row['wa_lastact'] ? intval($row['wa_lastact']) : null,
-                'browser' => $row['wa_browser'],
-                'os' => $row['wa_os'],
-                'device' => $row['wa_device'],
-                'current' => ($auth['sid'] == $row['sid']) 
+            $assets[] = [
+                'symbol' => $row['assetid'],
+                'name' => $row['name'],
+                'iconUrl' => $row['icon_url'],
+                'maxPrec' => $this -> getMaxPrec($row['assetid']),
+                'experimental' => $row['experimental']
             ];
         }
         
         return [
-            'sessions' => $sessions,
+            'assets' => $assets,
             'more' => $pag -> more
-        ];*/
+        ];
     }
 }
 
