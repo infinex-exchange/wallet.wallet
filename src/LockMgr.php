@@ -252,7 +252,7 @@ class LockMgr {
         );
         
         $sql = 'UPDATE wallet_balances new
-                SET new.locked = old.locked + old.avbl
+                SET locked = old.locked + old.avbl
                 FROM (
                     SELECT uid,
                            assetid,
