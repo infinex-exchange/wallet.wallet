@@ -53,7 +53,7 @@ class LockMgr {
                 return $th -> simpleCommit(
                     $body['lockid'],
                     $body['reason'],
-                    $body['context']
+                    isset($body['context']) ? $body['context'] : null
                 );
             }
         );
@@ -65,7 +65,7 @@ class LockMgr {
                     $body['uid'],
                     $body['asset'],
                     $body['reason'],
-                    $body['context']
+                    isset($body['context']) ? $body['context'] : null
                 );
             }
         );
@@ -76,7 +76,7 @@ class LockMgr {
                 return $th -> delayedRelease(
                     $body['lockid'],
                     $body['reason'],
-                    $body['context']
+                    isset($body['context']) ? $body['context'] : null
                 );
             }
         );
@@ -88,7 +88,7 @@ class LockMgr {
                     $body['lockid'],
                     $body['amount'],
                     $body['reason'],
-                    $body['context']
+                    isset($body['context']) ? $body['context'] : null
                 );
             }
         );
