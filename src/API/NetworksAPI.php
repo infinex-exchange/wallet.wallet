@@ -7,10 +7,14 @@ use Infinex\Database\Search;
 class NetworksAPI {
     private $log;
     private $pdo;
+    private $networks;
+    private $assets;
     
-    function __construct($log, $pdo) {
+    function __construct($log, $pdo, $networks, $assets) {
         $this -> log = $log;
         $this -> pdo = $pdo;
+        $this -> networks = $networks;
+        $this -> assets = $assets;
         
         $this -> log -> debug('Initialized networks API');
     }
@@ -32,7 +36,9 @@ class NetworksAPI {
             $query
         );
         
-        $task = [];
+        $task = [
+            ':assetid' => $assetid
+        ];
         $search -> updateTask($task);
         
         $sql = 'SELECT networks.netid,
@@ -41,13 +47,10 @@ class NetworksAPI {
                        assets.icon_url
                 FROM networks,
                      asset_network,
-                     asset_network AS an2,
                      assets
                 WHERE asset_network.netid = networks.netid
-                AND asset_network.assetid = assets.assetid
-                AND asset_network.contract IS NULL
-                AND an2.netid = networks.netid
-                AND an2.assetid = :assetid'
+                AND asset_network.assetid = :assetid
+                AND assets.assetid = networks.native_assetid'
              . $search -> sql()
              .' ORDER BY networks.netid ASC'
              . $pag -> sql();
@@ -55,63 +58,59 @@ class NetworksAPI {
         $q = $this -> pdo -> prepare($sql);
         $q -> execute($task);
         
-        $assets = [];
+        $networks = [];
         
         while($row = $q -> fetch()) {
             if($pag -> iter()) break;
-            
-            $assets[] = [
-                'symbol' => $row['assetid'],
-                'name' => $row['name'],
-                'iconUrl' => $row['icon_url'],
-                'maxPrec' => $row['max_prec'],
-                'experimental' => $row['experimental']
-            ];
+            $networks[] = $this -> rowToRespItem($row);
         }
         
         return [
-            'assets' => $assets,
+            'networks' => $networks,
             'more' => $pag -> more
         ];
     }
     
-    public function getAsset($path, $query, $body, $auth) {
-        if(!validateAssetSymbol($path['symbol']))
-            throw new Error('VALIDATION_ERROR', 'symbol', 400);
+    public function getNetworkOfAsset($path, $query, $body, $auth) {
+        $assetid = $this -> assets -> symbolToAssetId($path['asset']);
+        $netid = $this -> networks -> symbolToNetId($path['network']);
         
         $task = [
-            ':symbol' => $path['symbol']
+            ':assetid' => $assetid,
+            ':netid' => $netid
         ];
         
-        $sql = 'SELECT assets.assetid,
-                       assets.name,
-                       assets.icon_url,
-                       assets.experimental,
-                       MAX(asset_network.prec) AS max_prec
-                FROM assets,
-                     asset_network
-                WHERE asset_network.assetid = assets.assetid
-                AND assets.assetid = :symbol
-                GROUP BY assets.assetid';
+        $sql = 'SELECT networks.netid,
+                       networks.description,
+                       EXTRACT(epoch FROM networks.last_ping) AS last_ping,
+                       assets.icon_url
+                FROM networks,
+                     asset_network,
+                     assets
+                WHERE asset_network.netid = networks.netid
+                AND asset_network.assetid = :assetid
+                AND asset_network.netid = :netid
+                AND assets.assetid = networks.native_assetid';
         
         $q = $this -> pdo -> prepare($sql);
         $q -> execute($task);
         $row = $q -> fetch();
         
         if(!$row)
-            throw new Error('NOT_FOUND', 'Asset '.$path['symbol'].' not found', 404);
+            throw new Error('NOT_FOUND', $path['network'].' is not a valid network for '.$path['asset'], 404);
         
-        return [
-            'symbol' => $row['assetid'],
-            'name' => $row['name'],
-            'iconUrl' => $row['icon_url'],
-            'maxPrec' => $row['max_prec'],
-            'experimental' => $row['experimental']
-        ];
+        return $this -> rowToRespItem($row);
     }
     
-    function validateNetworkSymbol($symbol) {
-        return preg_match('/^[A-Z0-9_]{1,32}$/', $symbol);
+    private function rowToRespItem($row) {
+        $operating = time() - intval($row['last_ping']) <= 5 * 60;
+            
+        return [
+            'symbol' => $row['netid'],
+            'name' => $row['description'],
+            'iconUrl' => $row['icon_url'],
+            'operating' => $operating
+        ];
     }
 }
 

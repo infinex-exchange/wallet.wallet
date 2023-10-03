@@ -2,10 +2,12 @@
 
 require __DIR__.'/WalletLog.php';
 require __DIR__.'/Assets.php';
+require __DIR__.'/Networks.php';
 require __DIR__.'/CreditDebit.php';
 require __DIR__.'/LockMgr.php';
 
 require __DIR__.'/API/AssetsBalancesAPI.php';
+require __DIR__.'/API/NetworksAPI.php';
 
 use React\Promise;
 
@@ -14,10 +16,12 @@ class App extends Infinex\App\App {
     
     private $wlog;
     private $assets;
+    private $networks;
     private $cd;
     private $locks;
     
     private $asbApi;
+    private $networksApi;
     private $rest;
     
     function __construct() {
@@ -37,6 +41,12 @@ class App extends Infinex\App\App {
         );
         
         $this -> assets = new Assets(
+            $this -> log,
+            $this -> amqp,
+            $this -> pdo
+        );
+        
+        $this -> networks = new Networks(
             $this -> log,
             $this -> amqp,
             $this -> pdo
@@ -62,11 +72,19 @@ class App extends Infinex\App\App {
             $this -> assets
         );
         
+        $this -> networksApi = new NetworksAPi(
+            $this -> log,
+            $this -> pdo,
+            $this -> networks,
+            $this -> assets
+        );
+        
         $this -> rest = new Infinex\API\REST(
             $this -> log,
             $this -> amqp,
             [
-                $this -> asbApi
+                $this -> asbApi,
+                $this -> networksApi
             ]
         );
     }
@@ -82,6 +100,7 @@ class App extends Infinex\App\App {
             function() use($th) {
                 return Promise\all([
                     $th -> assets -> start(),
+                    $th -> networks -> start(),
                     $th -> cd -> start(),
                     $th -> lockMgr -> start()
                 ]);
@@ -104,6 +123,7 @@ class App extends Infinex\App\App {
             function() use($th) {
                 return Promise\all([
                     $th -> assets -> stop(),
+                    $th -> networks -> stop(),
                     $th -> cd -> stop(),
                     $th -> lockMgr -> stop(),
                 ]);
