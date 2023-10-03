@@ -22,7 +22,6 @@ class NetworksAPI {
     
     public function getNetworksOfAsset($path, $query, $body, $auth) {
         $assetid = $this -> assets -> symbolToAssetId($path['asset']);
-        // validate and check if the asset exists
         
         $pag = new Pagination\Offset(50, 500, $query);
         $search = new Search(
