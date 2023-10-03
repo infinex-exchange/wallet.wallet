@@ -243,7 +243,7 @@ class LockMgr {
         $this -> pdo -> commit();
     }
     
-    public function delayedLock($uid, $assetid, reason, $context) {
+    public function delayedLock($uid, $assetid, $reason, $context) {
         $this -> pdo -> beginTransaction();
         
         $task = array(
