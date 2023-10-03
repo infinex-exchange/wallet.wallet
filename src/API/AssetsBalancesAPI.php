@@ -74,17 +74,13 @@ class AssetsBalancesAPI {
         if($balances) {
             $task[':uid'] = $auth['uid'];
             
-            $sql = 'SELECT inner.assetid,
-                           inner.name,
-                           inner.icon_url,
-                           inner.default_prec,
-                           inner.max_prec,
+            $sql = 'SELECT inn.*,
                            wallet_balances.total,
                            wallet_balances.locked
                     FROM ('
                  . $sql
-                 .' ) AS inner
-                    LEFT JOIN wallet_balances ON wallet_balances.assetid = inner.assetid
+                 .' ) AS inn
+                    LEFT JOIN wallet_balances ON wallet_balances.assetid = inn.assetid
                     WHERE wallet_balances.uid = :uid';
             
             if(isset($query['nonZero']))
@@ -136,17 +132,13 @@ class AssetsBalancesAPI {
         if($balances) {
             $task[':uid'] = $auth['uid'];
             
-            $sql = 'SELECT inner.assetid,
-                           inner.name,
-                           inner.icon_url,
-                           inner.default_prec,
-                           inner.max_prec,
+            $sql = 'SELECT inn.*,
                            wallet_balances.total,
                            wallet_balances.locked
                     FROM ('
                  . $sql
-                 .' ) AS inner
-                    LEFT JOIN wallet_balances ON wallet_balances.assetid = inner.assetid
+                 .' ) AS inn
+                    LEFT JOIN wallet_balances ON wallet_balances.assetid = inn.assetid
                     WHERE wallet_balances.uid = :uid';
         }
         
