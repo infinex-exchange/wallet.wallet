@@ -1,6 +1,7 @@
 <?php
 
 require __DIR__.'/WalletLog.php';
+require __DIR__.'/Assets.php';
 require __DIR__.'/CreditDebit.php';
 require __DIR__.'/LockMgr.php';
 
@@ -12,6 +13,7 @@ class App extends Infinex\App\App {
     private $pdo;
     
     private $wlog;
+    private $assets;
     private $cd;
     private $locks;
     
@@ -34,6 +36,12 @@ class App extends Infinex\App\App {
             $this -> log
         );
         
+        $this -> assets = new Assets(
+            $this -> log,
+            $this -> amqp,
+            $this -> pdo
+        );
+        
         $this -> cd = new CreditDebit(
             $this -> log,
             $this -> amqp,
@@ -50,7 +58,8 @@ class App extends Infinex\App\App {
         
         $this -> asbApi = new AssetsBalancesAPI(
             $this -> log,
-            $this -> pdo
+            $this -> pdo,
+            $this -> assets
         );
         
         $this -> rest = new Infinex\API\REST(
@@ -72,6 +81,7 @@ class App extends Infinex\App\App {
         ) -> then(
             function() use($th) {
                 return Promise\all([
+                    $th -> assets -> start(),
                     $th -> cd -> start(),
                     $th -> lockMgr -> start()
                 ]);
@@ -93,6 +103,7 @@ class App extends Infinex\App\App {
         $this -> rest -> stop() -> then(
             function() use($th) {
                 return Promise\all([
+                    $th -> assets -> stop(),
                     $th -> cd -> stop(),
                     $th -> lockMgr -> stop(),
                 ]);

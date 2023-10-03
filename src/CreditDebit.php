@@ -28,7 +28,7 @@ class CreditDebit {
             function($body) use($th) {
                 return $th -> credit(
                     $body['uid'],
-                    $body['asset'],
+                    $body['assetid'],
                     $body['amount'],
                     $body['reason'],
                     isset($body['context']) ? $body['context'] : null
@@ -41,7 +41,7 @@ class CreditDebit {
             function($body) use($th) {
                 return $th -> debit(
                     $body['uid'],
-                    $body['asset'],
+                    $body['assetid'],
                     $body['amount'],
                     $body['reason'],
                     isset($body['context']) ? $body['context'] : null
@@ -80,12 +80,12 @@ class CreditDebit {
         );
     }
     
-    public function credit($uid, $asset, $amount, $reason, $context) {
+    public function credit($uid, $assetid, $amount, $reason, $context) {
         $this -> pdo -> beginTransaction();
         
         $task = array(
             ':uid' => $uid,
-            ':assetid' => $asset,
+            ':assetid' => $assetid,
             ':amount' => $amount
         );
         
@@ -120,7 +120,7 @@ class CreditDebit {
             'CREDIT',
             null,
             $uid,
-            $asset,
+            $assetid,
             $amount,
             $reason,
             $context
@@ -129,12 +129,12 @@ class CreditDebit {
         $this -> pdo -> commit();
     }
     
-    public function debit($uid, $asset, $amount, $reason, $context) {
+    public function debit($uid, $assetid, $amount, $reason, $context) {
         $this -> pdo -> beginTransaction();
         
         $task = array(
             ':uid' => $uid,
-            ':assetid' => $asset,
+            ':assetid' => $assetid,
             ':amount' => $amount,
             ':amount2' => $amount
         );
@@ -160,7 +160,7 @@ class CreditDebit {
             'DEBIT',
             null,
             $uid,
-            $asset,
+            $assetid,
             $amount,
             $reason,
             $context

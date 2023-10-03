@@ -28,7 +28,7 @@ class LockMgr {
             function($body) use($th) {
                 return $th -> simpleLock(
                     $body['uid'],
-                    $body['asset'],
+                    $body['assetid'],
                     $body['amount'],
                     $body['reason'],
                     isset($body['context']) ? $body['context'] : null
@@ -63,7 +63,7 @@ class LockMgr {
             function($body) use($th) {
                 return $th -> delayedLock(
                     $body['uid'],
-                    $body['asset'],
+                    $body['assetid'],
                     $body['reason'],
                     isset($body['context']) ? $body['context'] : null
                 );
@@ -124,12 +124,12 @@ class LockMgr {
         );
     }
     
-    public function simpleLock($uid, $asset, $amount, $reason, $context) {
+    public function simpleLock($uid, $assetid, $amount, $reason, $context) {
         $this -> pdo -> beginTransaction();
         
         $task = array(
             ':uid' => $uid,
-            ':assetid' => $asset,
+            ':assetid' => $assetid,
             ':amount' => $amount,
             ':amount2' => $amount
         );
@@ -154,7 +154,7 @@ class LockMgr {
             $this -> pdo,
             'SIMPLE',
             $uid,
-            $asset,
+            $assetid,
             $amount
         );
         
@@ -163,7 +163,7 @@ class LockMgr {
             'LOCK_SIMPLE',
             $lockid,
             $uid,
-            $asset,
+            $assetid,
             $amount,
             $reason,
             $context
@@ -243,12 +243,12 @@ class LockMgr {
         $this -> pdo -> commit();
     }
     
-    public function delayedLock($uid, $asset, $reason, $context) {
+    public function delayedLock($uid, $assetid, reason, $context) {
         $this -> pdo -> beginTransaction();
         
         $task = array(
             ':uid' => $uid,
-            ':assetid' => $asset
+            ':assetid' => $assetid
         );
         
         $sql = 'UPDATE wallet_balances new
@@ -281,7 +281,7 @@ class LockMgr {
             $this -> pdo,
             'DELAYED',
             $uid,
-            $asset,
+            $assetid,
             $amount
         );
         
@@ -290,7 +290,7 @@ class LockMgr {
             'LOCK_DELAYED',
             $lockid,
             $uid,
-            $asset,
+            $assetid,
             $amount,
             $reason,
             $context

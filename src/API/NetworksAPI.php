@@ -1,7 +1,5 @@
 <?php
 
-require_once __DIR__.'/validate.php';
-
 use Infinex\Exceptions\Error;
 use Infinex\Pagination;
 use Infinex\Database\Search;
@@ -23,6 +21,9 @@ class NetworksAPI {
     }
     
     public function getNetworksOfAsset($path, $query, $body, $auth) {
+        $assetid = $this -> assets -> symbolToAssetId($path['asset']);
+        // validate and check if the asset exists
+        
         $pag = new Pagination\Offset(50, 500, $query);
         $search = new Search(
             [
@@ -35,17 +36,21 @@ class NetworksAPI {
         $task = [];
         $search -> updateTask($task);
         
-        $sql = 'SELECT assets.assetid,
-                       assets.name,
-                       assets.icon_url,
-                       assets.experimental,
-                       MAX(asset_network.prec) AS max_prec
-                FROM assets,
-                     asset_network
-                WHERE asset_network.assetid = assets.assetid'
+        $sql = 'SELECT networks.netid,
+                       networks.description,
+                       EXTRACT(epoch FROM networks.last_ping) AS last_ping,
+                       assets.icon_url
+                FROM networks,
+                     asset_network,
+                     asset_network AS an2,
+                     assets
+                WHERE asset_network.netid = networks.netid
+                AND asset_network.assetid = assets.assetid
+                AND asset_network.contract IS NULL
+                AND an2.netid = networks.netid
+                AND an2.assetid = :assetid'
              . $search -> sql()
-             .' GROUP BY assets.assetid
-                ORDER BY assets.assetid ASC'
+             .' ORDER BY networks.netid ASC'
              . $pag -> sql();
         
         $q = $this -> pdo -> prepare($sql);
@@ -104,6 +109,10 @@ class NetworksAPI {
             'maxPrec' => $row['max_prec'],
             'experimental' => $row['experimental']
         ];
+    }
+    
+    function validateNetworkSymbol($symbol) {
+        return preg_match('/^[A-Z0-9_]{1,32}$/', $symbol);
     }
 }
 

@@ -1,7 +1,5 @@
 <?php
 
-require_once __DIR__.'/validate.php';
-
 use Infinex\Exceptions\Error;
 use Infinex\Pagination;
 use Infinex\Database\Search;
@@ -11,10 +9,12 @@ use function Infinex\Math\trimFloat;
 class AssetsBalancesAPI {
     private $log;
     private $pdo;
+    private $assets;
     
-    function __construct($log, $pdo) {
+    function __construct($log, $pdo, $assets) {
         $this -> log = $log;
         $this -> pdo = $pdo;
+        $this -> assets = $assets;
         
         $this -> log -> debug('Initialized assets / balances API');
     }
@@ -113,11 +113,10 @@ class AssetsBalancesAPI {
         if($balances && !$auth)
             throw new Error('UNAUTHORIZED', 'Unauthorized', 401);
         
-        if(!validateAssetSymbol($path['symbol']))
-            throw new Error('VALIDATION_ERROR', 'symbol', 400);
+        $assetid = $this -> assets -> symbolToAssetId($path['symbol']);
         
         $task = [
-            ':symbol' => $path['symbol']
+            ':assetid' => $assetid
         ];
         
         $sql = 'SELECT assets.assetid,
@@ -128,7 +127,7 @@ class AssetsBalancesAPI {
                 FROM assets,
                      asset_network
                 WHERE asset_network.assetid = assets.assetid
-                AND assets.assetid = :symbol
+                AND assets.assetid = :assetid
                 GROUP BY assets.assetid';
         
         if($balances) {
@@ -142,6 +141,11 @@ class AssetsBalancesAPI {
                  .' ) AS inn
                     LEFT JOIN wallet_balances ON wallet_balances.assetid = inn.assetid
                     WHERE wallet_balances.uid = :uid';
+            
+            if(isset($query['nonZero']))
+                $sql .= ' AND wallet_balances.total IS NOT NULL
+                          AND wallet_balances.total != 0';
+            
         }
         
         $q = $this -> pdo -> prepare($sql);
@@ -149,12 +153,12 @@ class AssetsBalancesAPI {
         $row = $q -> fetch();
         
         if(!$row)
-            throw new Error('NOT_FOUND', 'Asset '.$path['symbol'].' not found', 404);
+            throw new Error('NOT_FOUND', 'Empty balance for asset '.$path['symbol'], 404);
         
-        return $this -> commonRowToRespItem($balances, $row, isset($query['nonZero']));
+        return $this -> commonRowToRespItem($balances, $row);
     }
     
-    private function commonRowToRespItem($balances, $row, $throwOnZero = false) {
+    private function commonRowToRespItem($balances, $row) {
         $item = [
             'symbol' => $row['assetid'],
             'name' => $row['name'],
@@ -165,17 +169,11 @@ class AssetsBalancesAPI {
             
         if($balances) {
             if($row['total'] == null) {
-                if($throwOnZero)
-                    throw new Error('NOT_FOUND', 'Empty balance for asset '.$row['assetid'], 404);
                 $item['total'] = '0';
                 $item['locked'] = '0';
                 $item['avbl'] = '0';
             } else {
                 $dTotal = new Decimal($row['total']);
-                
-                if($throwOnZero && $dTotal -> isZero())
-                    throw new Error('NOT_FOUND', 'Empty balance for asset '.$row['assetid'], 404);
-                
                 $dLocked = new Decimal($row['locked']);
                 $dAvbl = $dTotal - $dLocked;
                 
