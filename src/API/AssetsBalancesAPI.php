@@ -85,7 +85,8 @@ class AssetsBalancesAPI {
             
             if(isset($query['nonZero']))
                 $sql .= ' AND wallet_balances.total IS NOT NULL
-                          AND wallet_balances.total != 0';
+                          AND wallet_balances.total != 0
+                          ORDER BY inn.assetid ASC';
         }
         
         $q = $this -> pdo -> prepare($sql);
