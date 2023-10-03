@@ -4,7 +4,7 @@ require __DIR__.'/WalletLog.php';
 require __DIR__.'/CreditDebit.php';
 require __DIR__.'/LockMgr.php';
 
-require __DIR__.'/API/AssetsAPI.php';
+require __DIR__.'/API/AssetsBalancesAPI.php';
 
 use React\Promise;
 
@@ -15,7 +15,7 @@ class App extends Infinex\App\App {
     private $cd;
     private $locks;
     
-    private $assetsApi;
+    private $asbApi;
     private $rest;
     
     function __construct() {
@@ -48,7 +48,7 @@ class App extends Infinex\App\App {
             $this -> wlog
         );
         
-        $this -> assetsApi = new AssetsAPI(
+        $this -> asbApi = new AssetsBalancesAPI(
             $this -> log,
             $this -> pdo
         );
@@ -57,7 +57,7 @@ class App extends Infinex\App\App {
             $this -> log,
             $this -> amqp,
             [
-                $this -> assetsApi
+                $this -> asbApi
             ]
         );
     }
