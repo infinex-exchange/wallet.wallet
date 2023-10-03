@@ -74,7 +74,11 @@ class AssetsBalancesAPI {
         if($balances) {
             $task[':uid'] = $auth['uid'];
             
-            $sql = 'SELECT inner.*,
+            $sql = 'SELECT inner.assetid,
+                           inner.name,
+                           inner.icon_url,
+                           inner.default_prec,
+                           inner.max_prec,
                            wallet_balances.total,
                            wallet_balances.locked
                     FROM ('
@@ -132,7 +136,11 @@ class AssetsBalancesAPI {
         if($balances) {
             $task[':uid'] = $auth['uid'];
             
-            $sql = 'SELECT inner.*,
+            $sql = 'SELECT inner.assetid,
+                           inner.name,
+                           inner.icon_url,
+                           inner.default_prec,
+                           inner.max_prec,
                            wallet_balances.total,
                            wallet_balances.locked
                     FROM ('
