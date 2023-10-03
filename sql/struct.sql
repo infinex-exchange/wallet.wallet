@@ -6,7 +6,8 @@ create table assets(
     assetid varchar(32) not null primary key,
     name varchar(64) not null,
     icon_url varchar(255) not null,
-    experimental boolean not null default FALSE
+    experimental boolean not null default FALSE,
+    default_prec int not null
 );
 
 GRANT SELECT ON assets TO "wallet.wallet";
