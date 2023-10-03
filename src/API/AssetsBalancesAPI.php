@@ -152,7 +152,7 @@ class AssetsBalancesAPI {
         return $this -> commonRowToRespItem($balances, $row, isset($query['nonZero']));
     }
     
-    private function commonRowToRespItem($balances, $row, $throwOnZero) {
+    private function commonRowToRespItem($balances, $row, $throwOnZero = false) {
         $item = [
             'symbol' => $row['assetid'],
             'name' => $row['name'],
