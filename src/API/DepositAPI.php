@@ -5,12 +5,12 @@ use Infinex\Exceptions\Error;
 class DepositAPI {
     private $log;
     private $pdo;
-    private $networks;
+    private $an;
     
-    function __construct($log, $pdo, $networks) {
+    function __construct($log, $pdo, $an) {
         $this -> log = $log;
         $this -> pdo = $pdo;
-        $this -> networks = $networks;
+        $this -> an = $an;
         
         $this -> log -> debug('Initialized deposit API');
     }
@@ -23,7 +23,7 @@ class DepositAPI {
         if(!$auth)
             throw new Error('UNAUTHORIZED', 'Unauthorized', 401);
         
-        $pairing = $this -> networks -> resolveAssetNetworkPair($path['asset'], $path['network'], false);
+        $pairing = $this -> an -> resolveAssetNetworkPair($path['asset'], $path['network'], false);
         
         // Get network details
         
@@ -130,7 +130,8 @@ class DepositAPI {
             'operating' => $operating,
             'contract' => $infoAn['contract'],
             'address' => $infoAddr['address'],
-            'memo' => null
+            'memo' => null,
+            'minAmount' => $this -> an -> getMinDepositAmount($pairing['assetid'], $pairing['netid'])
         ];
         
         // Memo only if both set

@@ -3,6 +3,7 @@
 require __DIR__.'/WalletLog.php';
 require __DIR__.'/Assets.php';
 require __DIR__.'/Networks.php';
+require __DIR__.'/AssetNetwork.php';
 require __DIR__.'/CreditDebit.php';
 require __DIR__.'/LockMgr.php';
 
@@ -18,6 +19,7 @@ class App extends Infinex\App\App {
     private $wlog;
     private $assets;
     private $networks;
+    private $an;
     private $cd;
     private $locks;
     
@@ -51,8 +53,15 @@ class App extends Infinex\App\App {
         $this -> networks = new Networks(
             $this -> log,
             $this -> amqp,
+            $this -> pdo
+        );
+        
+        $this -> an = new AssetNetwork(
+            $this -> log,
+            $this -> amqp,
             $this -> pdo,
-            $this -> assets
+            $this -> assets,
+            $this -> networks
         );
         
         $this -> cd = new CreditDebit(
@@ -78,14 +87,14 @@ class App extends Infinex\App\App {
         $this -> networksApi = new NetworksAPI(
             $this -> log,
             $this -> pdo,
-            $this -> networks,
-            $this -> assets
+            $this -> assets,
+            $this -> an
         );
         
         $this -> depositApi = new DepositAPI(
             $this -> log,
             $this -> pdo,
-            $this -> networks
+            $this -> an
         );
         
         $this -> rest = new Infinex\API\REST(
@@ -110,13 +119,14 @@ class App extends Infinex\App\App {
             function() use($th) {
                 return Promise\all([
                     $th -> assets -> start(),
+                    $th -> networks -> start(),
                     $th -> cd -> start(),
                     $th -> lockMgr -> start()
                 ]);
             }
         ) -> then(
             function() use($th) {
-                return $th -> networks -> start();
+                return $th -> an -> start();
             }
         ) -> then(
             function() use($th) {
@@ -134,12 +144,13 @@ class App extends Infinex\App\App {
         
         $this -> rest -> stop() -> then(
             function() use($th) {
-                return $th -> networks -> stop();
+                return $th -> an -> stop();
             }
         ) -> then(
             function() use($th) {
                 return Promise\all([
                     $th -> assets -> stop(),
+                    $th -> networks -> stop(),
                     $th -> cd -> stop(),
                     $th -> lockMgr -> stop(),
                 ]);

@@ -7,7 +7,9 @@ create table assets(
     name varchar(64) not null,
     icon_url varchar(255) not null,
     default_prec int not null,
-    enabled boolean not null
+    enabled boolean not null,
+    min_deposit decimal(65, 32) not null default 0,
+    min_withdrawal decimal(65, 32) not null default 0
 );
 
 GRANT SELECT ON assets TO "wallet.wallet";
@@ -43,6 +45,8 @@ create table asset_network(
     withdrawal_warning text default null,
     block_deposits_msg text default null,
     block_withdrawals_msg text default null,
+    min_deposit decimal(65, 32) not null default 0,
+    min_withdrawal decimal(65, 32) not null default 0,
     wd_fee_min decimal(65,32) not null default 1000000,
     wd_fee_max decimal(65,32) not null default 1000000,
     

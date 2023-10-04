@@ -6,14 +6,14 @@ use Infinex\Pagination;
 class NetworksAPI {
     private $log;
     private $pdo;
-    private $networks;
     private $assets;
+    private $an;
     
-    function __construct($log, $pdo, $networks, $assets) {
+    function __construct($log, $pdo, $assets, $an) {
         $this -> log = $log;
         $this -> pdo = $pdo;
-        $this -> networks = $networks;
         $this -> assets = $assets;
+        $this -> an = $an;
         
         $this -> log -> debug('Initialized networks API');
     }
@@ -64,7 +64,7 @@ class NetworksAPI {
     }
     
     public function getNetworkOfAsset($path, $query, $body, $auth) {
-        $pairing = $this -> networks -> resolveAssetNetworkPair($path['asset'], $path['network'], false);
+        $pairing = $this -> an -> resolveAssetNetworkPair($path['asset'], $path['network'], false);
         
         $task = [
             ':netid' => $pairing['netid']
