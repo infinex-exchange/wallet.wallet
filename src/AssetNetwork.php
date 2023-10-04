@@ -107,7 +107,7 @@ class AssetNetwork {
     }
     
     private function commonGetMin($type, $assetid, $netid) {
-        $task = array [
+        $task = [
             ':assetid' => $assetid
         ];
         
