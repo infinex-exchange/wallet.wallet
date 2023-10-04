@@ -118,8 +118,9 @@ class AssetNetwork {
         $q -> execute($task);
         $row = $q -> fetch();
         
+        $prec = $row['default_prec'];
         $min = new Decimal(1);
-        $min = $min -> shift($row['default_prec']);
+        $min = $min -> shift($prec);
         
         $col = 'min_'$type;
         
@@ -150,7 +151,7 @@ class AssetNetwork {
         if($minAn > $min)
             $min = $minAn;
         
-        return $min;
+        return $min -> toFixed($prec);
     }
 }
 
