@@ -1,0 +1,121 @@
+<?php
+
+use Infinex\Exceptions\Error;
+use function Infinex\Math\trimFloat;
+use Decimal\Decimal;
+
+class WithdrawalAPI {
+    private $log;
+    private $pdo;
+    private $an;
+    
+    function __construct($log, $pdo, $an) {
+        $this -> log = $log;
+        $this -> pdo = $pdo;
+        $this -> an = $an;
+        
+        $this -> log -> debug('Initialized withdrawal API');
+    }
+    
+    public function initRoutes($rc) {
+        $rc -> get('/withdrawal/{asset}/{network}', [$this, 'preflight']);
+    }
+    
+    public function preflight($path, $query, $body, $auth) {
+        if(!$auth)
+            throw new Error('UNAUTHORIZED', 'Unauthorized', 401);
+        
+        $pairing = $this -> an -> resolveAssetNetworkPair($path['asset'], $path['network'], false);
+        
+        // Get network details
+        
+        $task = [
+            ':netid' => $pairing['netid']
+        ];
+        
+        $sql = 'SELECT memo_name,
+                       withdrawal_warning,
+                       block_withdrawals_msg
+                FROM networks
+                WHERE netid = :netid';
+        
+        $q = $this -> pdo -> prepare($sql);
+        $q -> execute($task);
+        $infoNet = $q -> fetch();
+        
+        if($infoNet['block_withdrawals_msg'] !== null)
+            throw new Error('FORBIDDEN', $infoNet['block_withdrawals_msg'], 403);
+        
+        // Get asset_network details
+        
+        $task = [
+            ':assetid' => $pairing['assetid'],
+            ':netid' => $pairing['netid']
+        ];
+        
+        $sql = 'SELECT contract,
+                       prec,
+                       wd_fee_base,
+                       wd_fee_min,
+                       wd_fee_max,
+                       withdrawal_warning,
+                       block_withdrawals_msg
+                FROM asset_network
+                WHERE assetid = :assetid
+                AND netid = :netid';
+        
+        $q = $this -> pdo -> prepare($sql);
+        $q -> execute($task);
+        $infoAn = $q -> fetch();
+        
+        if($infoAn['block_withdrawals_msg'] !== null)
+            throw new Error('FORBIDDEN', $infoAn['block_withdrawals_msg'], 403);
+        
+        // Get shard details
+        
+        $task = [
+            ':netid' => $pairing['netid']
+        ];
+        
+        $sql = 'SELECT EXTRACT(epoch FROM MAX(last_ping)) AS last_ping
+                FROM wallet_nodes
+                WHERE netid = :netid';
+        
+        $q = $this -> pdo -> prepare($sql);
+        $q -> execute($task);
+        $infoShard = $q -> fetch();
+        
+        $operating = time() - intval($infoShard['last_ping']) <= 5 * 60;
+        
+        // Prepare response
+        
+        $dFeeBase = new Decimal($infoAn['wd_fee_base']);
+        
+        $dFeeMin = new Decimal($infoAn['wd_fee_min']);
+        $dFeeMin += $dFeeBase;
+        
+        $dFeeMax = new Decimal($infoAn['wd_fee_max']);
+        $dFeeMax += $dFeeBase;
+                
+        $resp = [
+            'memoName' => $infoNet['memo_name'],
+            'warnings' => [],
+            'operating' => $operating,
+            'contract' => $infoAn['contract'],
+            'minAmount' => $this -> an -> getMinWithdrawalAmount($pairing['assetid'], $pairing['netid']),
+            'prec' => $infoAn['prec'],
+            'feeMin' => trimFloat($dFeeMin -> toFixed($infoAn['prec'])),
+            'feeMax' => trimFloat($dFeeMax -> toFixed($infoAn['prec']))
+        ];
+        
+        // Warnings
+        if($infoNet['withdrawal_warning'] !== null)
+            $resp['warnings'][] = $infoNet['withdrawal_warning'];
+        if($infoAn['withdrawal_warning'] !== null)
+            $resp['warnings'][] = $infoAn['withdrawal_warning'];
+        
+        return $resp;
+    }
+}
+
+?>

@@ -10,6 +10,7 @@ require __DIR__.'/LockMgr.php';
 require __DIR__.'/API/AssetsBalancesAPI.php';
 require __DIR__.'/API/NetworksAPI.php';
 require __DIR__.'/API/DepositAPI.php';
+require __DIR__.'/API/WithdrawalAPI.php';
 
 use React\Promise;
 
@@ -26,6 +27,7 @@ class App extends Infinex\App\App {
     private $asbApi;
     private $networksApi;
     private $depositApi;
+    private $withdrawalApi;
     private $rest;
     
     function __construct() {
@@ -97,13 +99,20 @@ class App extends Infinex\App\App {
             $this -> an
         );
         
+        $this -> withdrawalApi = new WithdrawalAPI(
+            $this -> log,
+            $this -> pdo,
+            $this -> an
+        );
+        
         $this -> rest = new Infinex\API\REST(
             $this -> log,
             $this -> amqp,
             [
                 $this -> asbApi,
                 $this -> networksApi,
-                $this -> depositApi
+                $this -> depositApi 
+                $this -> withdrawalApi
             ]
         );
     }

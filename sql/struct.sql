@@ -101,9 +101,8 @@ create table wallet_shards(
     netid varchar(32) not null,
     number int not null,
     deposit_warning text default null,
-    withdrawal_warning text default null,
     block_deposits_msg text default null,
-    block_withdrawals_msg text default null,
+    block_withdrawals boolean not null default FALSE,
     
     foreign key(netid) references networks(netid)
 );
