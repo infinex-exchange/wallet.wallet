@@ -24,7 +24,7 @@ class NetworksAPI {
     }
     
     public function getNetworksOfAsset($path, $query, $body, $auth) {
-        $assetid = $this -> assets -> symbolToAssetId($path['asset']);
+        $assetid = $this -> assets -> symbolToAssetId($path['asset'], false);
         
         $pag = new Pagination\Offset(50, 500, $query);
         
@@ -64,8 +64,8 @@ class NetworksAPI {
     }
     
     public function getNetworkOfAsset($path, $query, $body, $auth) {
-        $assetid = $this -> assets -> symbolToAssetId($path['asset']);
-        $netid = $this -> networks -> symbolToNetId($path['network']);
+        $assetid = $this -> assets -> symbolToAssetId($path['asset'], false);
+        $netid = $this -> networks -> symbolToNetId($path['network'], false);
         
         $task = [
             ':assetid' => $assetid,
