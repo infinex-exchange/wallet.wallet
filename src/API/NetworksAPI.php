@@ -64,36 +64,24 @@ class NetworksAPI {
     }
     
     public function getNetworkOfAsset($path, $query, $body, $auth) {
-        $assetid = $this -> assets -> symbolToAssetId($path['asset'], false);
-        $netid = $this -> networks -> symbolToNetId($path['network'], false);
+        $pairing = $this -> networks -> resolveAssetNetworkPair($path['asset'], $path['network'], false);
         
         $task = [
-            ':assetid' => $assetid,
-            ':netid' => $netid
+            ':netid' => $pairing['netid']
         ];
         
         $sql = 'SELECT networks.netid,
                        networks.description,
                        EXTRACT(epoch FROM networks.last_ping) AS last_ping,
-                       asset_network.enabled,
                        assets.icon_url
                 FROM networks,
-                     asset_network,
                      assets
-                WHERE asset_network.netid = networks.netid
-                AND asset_network.assetid = :assetid
-                AND asset_network.netid = :netid
+                WHERE networks.netid = :netid
                 AND assets.assetid = networks.native_assetid';
         
         $q = $this -> pdo -> prepare($sql);
         $q -> execute($task);
         $row = $q -> fetch();
-        
-        if(!$row)
-            throw new Error('NOT_FOUND', $path['network'].' is not a valid network for '.$path['asset'], 404);
-        
-        if(!$row['enabled'])
-            throw new Error('FORBIDDEN', 'Network '.$path['network'].' is disabled for asset '.$path['asset'], 403);
         
         return $this -> rowToRespItem($row);
     }

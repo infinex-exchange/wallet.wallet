@@ -92,3 +92,15 @@ SELECT create_hypertable('wallet_log', 'time');
 SELECT add_retention_policy('wallet_log', INTERVAL '2 years');
 
 GRANT INSERT ON wallet_log TO "wallet.wallet";
+
+create table deposit_addr(
+    addrid bigserial not null primary key,
+    netid varchar(32) not null,
+    address varchar(255) not null,
+    memo varchar(255) default null,
+    uid bigint default null,
+    
+    foreign key(netid) references networks(netid)
+);
+
+GRANT SELECT, INSERT, UPDATE ON deposit_addr TO "wallet.wallet";

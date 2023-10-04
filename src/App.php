@@ -8,6 +8,7 @@ require __DIR__.'/LockMgr.php';
 
 require __DIR__.'/API/AssetsBalancesAPI.php';
 require __DIR__.'/API/NetworksAPI.php';
+require __DIR__.'/API/DepositAPI.php';
 
 use React\Promise;
 
@@ -22,6 +23,7 @@ class App extends Infinex\App\App {
     
     private $asbApi;
     private $networksApi;
+    private $depositApi;
     private $rest;
     
     function __construct() {
@@ -49,7 +51,8 @@ class App extends Infinex\App\App {
         $this -> networks = new Networks(
             $this -> log,
             $this -> amqp,
-            $this -> pdo
+            $this -> pdo,
+            $this -> assets
         );
         
         $this -> cd = new CreditDebit(
@@ -72,11 +75,17 @@ class App extends Infinex\App\App {
             $this -> assets
         );
         
-        $this -> networksApi = new NetworksAPi(
+        $this -> networksApi = new NetworksAPI(
             $this -> log,
             $this -> pdo,
             $this -> networks,
             $this -> assets
+        );
+        
+        $this -> depositApi = new DepositAPI(
+            $this -> log,
+            $this -> pdo,
+            $this -> networks
         );
         
         $this -> rest = new Infinex\API\REST(
@@ -84,7 +93,8 @@ class App extends Infinex\App\App {
             $this -> amqp,
             [
                 $this -> asbApi,
-                $this -> networksApi
+                $this -> networksApi,
+                $this -> depositApi
             ]
         );
     }
@@ -100,10 +110,13 @@ class App extends Infinex\App\App {
             function() use($th) {
                 return Promise\all([
                     $th -> assets -> start(),
-                    $th -> networks -> start(),
                     $th -> cd -> start(),
                     $th -> lockMgr -> start()
                 ]);
+            }
+        ) -> then(
+            function() use($th) {
+                return $th -> networks -> start();
             }
         ) -> then(
             function() use($th) {
@@ -121,9 +134,12 @@ class App extends Infinex\App\App {
         
         $this -> rest -> stop() -> then(
             function() use($th) {
+                return $th -> networks -> stop();
+            }
+        ) -> then(
+            function() use($th) {
                 return Promise\all([
                     $th -> assets -> stop(),
-                    $th -> networks -> stop(),
                     $th -> cd -> stop(),
                     $th -> lockMgr -> stop(),
                 ]);

@@ -7,11 +7,13 @@ class Networks {
     private $log;
     private $amqp;
     private $pdo;
+    private $assets;
     
-    function __construct($log, $amqp, $pdo) {
+    function __construct($log, $amqp, $pdo, $assets) {
         $this -> log = $log;
         $this -> amqp = $amqp;
         $this -> pdo = $pdo;
+        $this -> assets = $assets;
         
         $this -> log -> debug('Initialized networks manager');
     }
@@ -38,6 +40,17 @@ class Networks {
             }
         );
         
+        $promises[] = $this -> amqp -> method(
+            'resolveAssetNetworkPair',
+            function($body) use($th) {
+                return $th -> resolveAssetNetworkPair(
+                    $body['assetSymbol'],
+                    $body['networkSymbol'],
+                    $body['allowDisabled']
+                );
+            }
+        );
+        
         return Promise\all($promises) -> then(
             function() use($th) {
                 $th -> log -> info('Started networks manager');
@@ -57,6 +70,7 @@ class Networks {
         
         $promises[] = $this -> amqp -> unreg('symbolToNetId');
         $promises[] = $this -> amqp -> unreg('netIdToSymbol');
+        $promises[] = $this -> amqp -> unreg('resolveAssetNetworkPair');
         
         return Promise\all($promises) -> then(
             function() use ($th) {
@@ -99,6 +113,36 @@ class Networks {
     
     public function netIdToSymbol($netid) {
         return $netid;
+    }
+    
+    public function resolveAssetNetworkPair($assetSymbol, $networkSymbol, $allowDisabled) {
+        $assetid = $this -> assets -> symbolToAssetId($assetSymbol, $allowDisabled);
+        $netid = $this -> symbolToNetId($networkSymbol, $allowDisabled);
+        
+        $task = [
+            ':assetid' => $assetid,
+            ':netid' => $netid
+        ];
+        
+        $sql = 'SELECT enabled
+                FROM asset_network
+                WHERE assetid = :assetid
+                AND netid = :netid';
+        
+        $q = $this -> pdo -> prepare($sql);
+        $q -> execute($task);
+        $row = $q -> fetch();
+        
+        if(!$row)
+            throw new Error('NOT_FOUND', "$networkSymbol is not a valid network for $assetSymbol", 404);
+        
+        if(!$allowDisabled && !$row['enabled'])
+            throw new Error('FORBIDDEN', "Network $networkSymbol is disabled for asset $assetSymbol", 403);
+        
+        return [
+            'assetid' => $assetid,
+            'netid' => $netid
+        ];
     }
     
     private function validateNetworkSymbol($symbol) {
