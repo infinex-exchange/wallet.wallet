@@ -121,7 +121,7 @@ class AssetNetwork {
         
         $prec = $row['default_prec'];
         $min = new Decimal(1);
-        $min = $min -> shift($prec);
+        $min = $min -> shift(-$prec);
         
         $col = 'min_'.$type;
         
