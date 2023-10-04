@@ -74,7 +74,6 @@ class DepositAPI {
         $this -> pdo -> beginTransaction();
         
         $task = [
-            ':assetid' => $pairing['assetid'],
             ':netid' => $pairing['netid'],
             ':uid' => $auth['uid']
         ];
