@@ -65,7 +65,8 @@ class AssetsBalancesAPI {
                        MAX(asset_network.prec) AS max_prec
                 FROM assets,
                      asset_network
-                WHERE asset_network.assetid = assets.assetid'
+                WHERE asset_network.assetid = assets.assetid
+                AND assets.enabled = TRUE'
              . $search -> sql()
              .' GROUP BY assets.assetid
                 ORDER BY assets.assetid ASC'
@@ -113,7 +114,7 @@ class AssetsBalancesAPI {
         if($balances && !$auth)
             throw new Error('UNAUTHORIZED', 'Unauthorized', 401);
         
-        $assetid = $this -> assets -> symbolToAssetId($path['symbol']);
+        $assetid = $this -> assets -> symbolToAssetId($path['symbol'], false);
         
         $task = [
             ':assetid' => $assetid
@@ -123,6 +124,7 @@ class AssetsBalancesAPI {
                        assets.name,
                        assets.icon_url,
                        assets.default_prec,
+                       assets.enabled,
                        MAX(asset_network.prec) AS max_prec
                 FROM assets,
                      asset_network

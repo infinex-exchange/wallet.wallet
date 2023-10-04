@@ -6,7 +6,8 @@ create table assets(
     assetid varchar(32) not null primary key,
     name varchar(64) not null,
     icon_url varchar(255) not null,
-    default_prec int not null
+    default_prec int not null,
+    enabled boolean not null
 );
 
 GRANT SELECT ON assets TO "wallet.wallet";
@@ -16,6 +17,7 @@ create table networks(
     description varchar(64) not null,
     native_assetid varchar(32) not null,
     confirms_target int not null,
+    enabled boolean not null,
     memo_name varchar(32) default null,
     native_qr_format varchar(255) default null,
     token_qr_format varchar(255) default null,
@@ -35,6 +37,7 @@ create table asset_network(
     netid varchar(32) not null,
     prec int not null,
     wd_fee_base decimal(65,32) not null,
+    enabled boolean not null,
     contract varchar(255) default null,
     deposit_warning text default null,
     withdrawal_warning text default null,

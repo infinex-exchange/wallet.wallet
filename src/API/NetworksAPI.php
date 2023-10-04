@@ -39,8 +39,10 @@ class NetworksAPI {
                 FROM networks,
                      asset_network,
                      assets
-                WHERE asset_network.netid = networks.netid
+                WHERE networks.enabled = TRUE
+                AND asset_network.netid = networks.netid
                 AND asset_network.assetid = :assetid
+                AND asset_network.enabled = TRUE
                 AND assets.assetid = networks.native_assetid
                 ORDER BY networks.netid ASC'
              . $pag -> sql();
@@ -73,6 +75,7 @@ class NetworksAPI {
         $sql = 'SELECT networks.netid,
                        networks.description,
                        EXTRACT(epoch FROM networks.last_ping) AS last_ping,
+                       asset_network.enabled,
                        assets.icon_url
                 FROM networks,
                      asset_network,
@@ -88,6 +91,9 @@ class NetworksAPI {
         
         if(!$row)
             throw new Error('NOT_FOUND', $path['network'].' is not a valid network for '.$path['asset'], 404);
+        
+        if(!$row['enabled'])
+            throw new Error('FORBIDDEN', 'Network '.$path['network'].' is disabled for asset '.$path['asset'], 403);
         
         return $this -> rowToRespItem($row);
     }

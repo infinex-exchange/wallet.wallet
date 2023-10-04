@@ -24,7 +24,10 @@ class Networks {
         $promises[] = $this -> amqp -> method(
             'symbolToNetId',
             function($body) use($th) {
-                return $th -> symbolToNetId($body['symbol']);
+                return $th -> symbolToNetId(
+                    $body['symbol'],
+                    $body['allowDisabled']
+                );
             }
         );
         
@@ -66,7 +69,7 @@ class Networks {
         );
     }
     
-    public function symbolToNetId($symbol) {
+    public function symbolToNetId($symbol, $allowDisabled) {
         // Nonsense function, but very important for future changes
         
         if(!$this -> validateNetworkSymbol($symbol))
@@ -76,7 +79,8 @@ class Networks {
             ':symbol' => $symbol
         );
         
-        $sql = 'SELECT netid
+        $sql = 'SELECT netid,
+                       enabled
                 FROM networks
                 WHERE netid = :symbol';
         
@@ -86,6 +90,9 @@ class Networks {
             
         if(!$row)
             throw new Error('NOT_FOUND', 'Network '.$symbol.' not found', 404);
+        
+        if(!$allowDisabled && !$row['enabled'])
+            throw new Error('FORBIDDEN', 'Network '.$symbol.' is disabled', 403);
         
         return $row['netid'];
     }

@@ -24,7 +24,10 @@ class Assets {
         $promises[] = $this -> amqp -> method(
             'symbolToAssetId',
             function($body) use($th) {
-                return $th -> symbolToAssetId($body['symbol']);
+                return $th -> symbolToAssetId(
+                    $body['symbol'],
+                    $body['allowDisabled']
+                );
             }
         );
         
@@ -66,7 +69,7 @@ class Assets {
         );
     }
     
-    public function symbolToAssetId($symbol) {
+    public function symbolToAssetId($symbol, $allowDisabled) {
         // Nonsense function, but very important for future changes
         
         if(!$this -> validateAssetSymbol($symbol))
@@ -76,7 +79,8 @@ class Assets {
             ':symbol' => $symbol
         );
         
-        $sql = 'SELECT assetid
+        $sql = 'SELECT assetid,
+                       enabled
                 FROM assets
                 WHERE assetid = :symbol';
         
@@ -86,6 +90,9 @@ class Assets {
             
         if(!$row)
             throw new Error('NOT_FOUND', 'Asset '.$symbol.' not found', 404);
+        
+        if(!$allowDisabled && !$row['enabled'])
+            throw new Error('FORBIDDEN', 'Asset '.$symbol.' is disabled', 403);
         
         return $row['assetid'];
     }
