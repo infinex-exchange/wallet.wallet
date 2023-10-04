@@ -36,8 +36,7 @@ class DepositAPI {
                        native_qr_format,
                        token_qr_format,
                        deposit_warning,
-                       block_deposits_msg,
-                       EXTRACT(epoch FROM last_ping) AS last_ping
+                       block_deposits_msg
                 FROM networks
                 WHERE netid = :netid';
         
@@ -78,7 +77,8 @@ class DepositAPI {
             ':uid' => $auth['uid']
         ];
         
-        $sql = 'SELECT address,
+        $sql = 'SELECT shardid,
+                       address,
                        memo
                 FROM deposit_addr
                 WHERE uid = :uid
@@ -104,7 +104,8 @@ class DepositAPI {
                         AND uid IS NULL
                         LIMIT 1
                     )
-                    RETURNING address,
+                    RETURNING shardid,
+                              address,
                               memo';
             
             $q = $this -> pdo -> prepare($sql);
@@ -119,7 +120,31 @@ class DepositAPI {
         
         $this -> pdo -> commit();
         
-        $operating = time() - intval($infoNet['last_ping']) <= 5 * 60;
+        // Get shard details
+        
+        $task = [
+            ':shardid' => $infoAddr['shardid']
+        ];
+        
+        $sql = 'SELECT wallet_shards.deposit_warning,
+                       wallet_shards.block_deposits_msg,
+                       EXTRACT(epoch FROM MAX(wallet_nodes.last_ping)) AS last_ping
+                FROM wallet_shards,
+                     wallet_nodes
+                WHERE wallet_nodes.shardid = wallet_shards.shardid
+                AND wallet_shards.shardid = :shardid
+                GROUP BY wallet_shards.shardid';
+        
+        $q = $this -> pdo -> prepare($sql);
+        $q -> execute($task);
+        $infoShard = $q -> fetch();
+        
+        if($infoShard['block_deposits_msg'] !== null)
+            throw new Error('FORBIDDEN', $infoShard['block_deposits_msg'], 403);
+        
+        $operating = time() - intval($infoShard['last_ping']) <= 5 * 60;
+        
+        // Prepare response
                 
         $resp = [
             'confirmTarget' => $infoNet['confirms_target'],
@@ -162,6 +187,8 @@ class DepositAPI {
             $resp['warnings'][] = $infoNet['deposit_warning'];
         if($infoAn['deposit_warning'] !== null)
             $resp['warnings'][] = $infoAn['deposit_warning'];
+        if($infoShard['deposit_warning'] !== null)
+            $resp['warnings'][] = $infoShard['deposit_warning'];
         
         return $resp;
     }

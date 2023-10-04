@@ -27,7 +27,6 @@ create table networks(
     withdrawal_warning text default null,
     block_deposits_msg text default null,
     block_withdrawals_msg text default null,
-    last_ping timestamptz not null default to_timestamp(0),
     
     foreign key(assetid) references assets(assetid)
 );
@@ -97,14 +96,40 @@ SELECT add_retention_policy('wallet_log', INTERVAL '2 years');
 
 GRANT INSERT ON wallet_log TO "wallet.wallet";
 
-create table deposit_addr(
-    addrid bigserial not null primary key,
+create table wallet_shards(
+    shardid bigserial not null primary key,
     netid varchar(32) not null,
-    address varchar(255) not null,
-    memo varchar(255) default null,
-    uid bigint default null,
+    number int not null,
+    deposit_warning text default null,
+    withdrawal_warning text default null,
+    block_deposits_msg text default null,
+    block_withdrawals_msg text default null,
     
     foreign key(netid) references networks(netid)
 );
 
+GRANT SELECT ON wallet_shards TO "wallet.wallet";
+
+create table deposit_addr(
+    addrid bigserial not null primary key,
+    netid varchar(32) not null,
+    shardid bigint not null,
+    address varchar(255) not null,
+    memo varchar(255) default null,
+    uid bigint default null,
+    
+    foreign key(netid) references networks(netid),
+    foreign key(shardid) references wallet_shards(shardid)
+);
+
 GRANT SELECT, INSERT, UPDATE ON deposit_addr TO "wallet.wallet";
+
+create table wallet_nodes(
+    nodeid bigserial not null,
+    netid varchar(32) not null,
+    shardid bigint not null,
+    last_ping timestamptz not null default to_timestamp(0),
+    
+    foreign key(netid) references networks(netid),
+    foreign key(shardid) references wallet_shards(shardid)
+);

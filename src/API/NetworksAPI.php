@@ -34,7 +34,6 @@ class NetworksAPI {
         
         $sql = 'SELECT networks.netid,
                        networks.description,
-                       EXTRACT(epoch FROM networks.last_ping) AS last_ping,
                        assets.icon_url
                 FROM networks,
                      asset_network,
@@ -72,7 +71,6 @@ class NetworksAPI {
         
         $sql = 'SELECT networks.netid,
                        networks.description,
-                       EXTRACT(epoch FROM networks.last_ping) AS last_ping,
                        assets.icon_url
                 FROM networks,
                      assets
@@ -87,13 +85,10 @@ class NetworksAPI {
     }
     
     private function rowToRespItem($row) {
-        $operating = time() - intval($row['last_ping']) <= 5 * 60;
-            
         return [
             'symbol' => $row['netid'],
             'name' => $row['description'],
-            'iconUrl' => $row['icon_url'],
-            'operating' => $operating
+            'iconUrl' => $row['icon_url']
         ];
     }
 }
