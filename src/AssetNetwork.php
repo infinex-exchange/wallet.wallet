@@ -123,7 +123,7 @@ class AssetNetwork {
         $min = new Decimal(1);
         $min = $min -> shift($prec);
         
-        $col = 'min_'$type;
+        $col = 'min_'.$type;
         
         $sql = "SELECT $col
                 FROM assets
