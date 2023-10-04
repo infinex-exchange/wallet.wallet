@@ -2,7 +2,6 @@
 
 use Infinex\Exceptions\Error;
 use Infinex\Pagination;
-use Infinex\Database\Search;
 
 class NetworksAPI {
     private $log;
@@ -28,18 +27,10 @@ class NetworksAPI {
         $assetid = $this -> assets -> symbolToAssetId($path['asset']);
         
         $pag = new Pagination\Offset(50, 500, $query);
-        $search = new Search(
-            [
-                'netid',
-                'description'
-            ],
-            $query
-        );
         
         $task = [
             ':assetid' => $assetid
         ];
-        $search -> updateTask($task);
         
         $sql = 'SELECT networks.netid,
                        networks.description,
@@ -50,9 +41,8 @@ class NetworksAPI {
                      assets
                 WHERE asset_network.netid = networks.netid
                 AND asset_network.assetid = :assetid
-                AND assets.assetid = networks.native_assetid'
-             . $search -> sql()
-             .' ORDER BY networks.netid ASC'
+                AND assets.assetid = networks.native_assetid
+                ORDER BY networks.netid ASC'
              . $pag -> sql();
         
         $q = $this -> pdo -> prepare($sql);
