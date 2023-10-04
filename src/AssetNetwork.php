@@ -3,6 +3,7 @@
 use Infinex\Exceptions\Error;
 use React\Promise;
 use Decimal\Decimal;
+use function Infinex\Math\trimFloat;
 
 class AssetNetwork {
     private $log;
@@ -151,7 +152,7 @@ class AssetNetwork {
         if($minAn > $min)
             $min = $minAn;
         
-        return $min -> toFixed($prec);
+        return trimFloat($min -> toFixed($prec));
     }
 }
 
