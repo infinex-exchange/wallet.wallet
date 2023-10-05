@@ -111,7 +111,7 @@ class App extends Infinex\App\App {
             [
                 $this -> asbApi,
                 $this -> networksApi,
-                $this -> depositApi 
+                $this -> depositApi,
                 $this -> withdrawalApi
             ]
         );
