@@ -129,6 +129,24 @@ class WithdrawalAPI {
         if(!isset($body['address']) && !isset($body['memo']))
             throw new Error('MISSING_DATA', 'At least one is required: address or memo', 400);
         
+        if(isset($body['memo'])) {
+            $task = [
+                ':netid' => $netid
+            ];
+            
+            $sql = 'SELECT 1
+                    FROM networks
+                    WHERE netid = :netid
+                    AND memo_name IS NOT NULL';
+            
+            $q = $this -> pdo -> prepare($sql);
+            $q -> execute($task);
+            $row = $q -> fetch();
+            
+            if(!$row)
+                throw new Error('CONFLICT', 'Network '.$path['network'].' does not support memo but provided', 409);
+        }
+        
         return $this -> amqp -> call(
             'wallet.io',
             'validateWithdrawalTarget',
