@@ -9,18 +9,21 @@ class WithdrawalAPI {
     private $amqp;
     private $pdo;
     private $an;
+    private $networks;
     
-    function __construct($log, $amqp, $pdo, $an) {
+    function __construct($log, $amqp, $pdo, $an, $networks) {
         $this -> log = $log;
         $this -> amqp = $amqp;
         $this -> pdo = $pdo;
         $this -> an = $an;
+        $this -> networks = $networks;
         
         $this -> log -> debug('Initialized withdrawal API');
     }
     
     public function initRoutes($rc) {
-        $rc -> get('/withdrawal/{asset}/{network}', [$this, 'preflight']);
+        $rc -> get('/withdrawal/{network}/{asset}', [$this, 'preflight']);
+        $rc -> post('/withdrawal/{network}', [$this, 'validate']);
     }
     
     public function preflight($path, $query, $body, $auth) {
@@ -115,6 +118,25 @@ class WithdrawalAPI {
             
             return $resp;
         });
+    }
+    
+    public function validate($path, $query, $body, $auth) {
+        if(!$auth)
+            throw new Error('UNAUTHORIZED', 'Unauthorized', 401);
+        
+        $netid = $this -> networks -> symbolToNetId($path['network'], false);
+        
+        if(!isset($body['address']) && !isset($body['memo']))
+            throw new Error('MISSING_DATA', 'At least one is required: address or memo', 400);
+        
+        return $this -> amqp -> call(
+            'wallet.io',
+            'validateWithdrawalTarget',
+            [
+                'address' => isset($body['address']) ? $body['addresss'] : null,
+                'memo' => isset($body['memo']) ? $body['memo'] : null
+            ]
+        );
     }
 }
 

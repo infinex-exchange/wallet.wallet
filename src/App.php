@@ -104,7 +104,8 @@ class App extends Infinex\App\App {
             $this -> log,
             $this -> amqp,
             $this -> pdo,
-            $this -> an
+            $this -> an,
+            $this -> networks
         );
         
         $this -> rest = new Infinex\API\REST(
