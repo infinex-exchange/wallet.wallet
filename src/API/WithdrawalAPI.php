@@ -6,11 +6,13 @@ use Decimal\Decimal;
 
 class WithdrawalAPI {
     private $log;
+    private $amqp;
     private $pdo;
     private $an;
     
-    function __construct($log, $pdo, $an) {
+    function __construct($log, $amqp, $pdo, $an) {
         $this -> log = $log;
+        $this -> amqp = $amqp;
         $this -> pdo = $pdo;
         $this -> an = $an;
         
@@ -71,50 +73,48 @@ class WithdrawalAPI {
         if($infoAn['block_withdrawals_msg'] !== null)
             throw new Error('FORBIDDEN', $infoAn['block_withdrawals_msg'], 403);
         
-        // Get shard details
+        // Get min amount
         
-        $task = [
-            ':netid' => $pairing['netid']
-        ];
+        $minAmount = $this -> an -> getMinWithdrawalAmount($pairing['assetid'], $pairing['netid']);
         
-        $sql = 'SELECT EXTRACT(epoch FROM MAX(last_ping)) AS last_ping
-                FROM wallet_nodes
-                WHERE netid = :netid';
+        // Get info from wallet.io
         
-        $q = $this -> pdo -> prepare($sql);
-        $q -> execute($task);
-        $infoShard = $q -> fetch();
+        return $this -> amqp -> call(
+            'wallet.io',
+            'getWithdrawalContext',
+            [
+                'netid' => $pairing['netid']
+            ]
+        ) -> then(function($infoIo) use($infoNet, $infoAn, $minAmount) {
+            // Prepare response
         
-        $operating = time() - intval($infoShard['last_ping']) <= 5 * 60;
-        
-        // Prepare response
-        
-        $dFeeBase = new Decimal($infoAn['wd_fee_base']);
-        
-        $dFeeMin = new Decimal($infoAn['wd_fee_min']);
-        $dFeeMin += $dFeeBase;
-        
-        $dFeeMax = new Decimal($infoAn['wd_fee_max']);
-        $dFeeMax += $dFeeBase;
-                
-        $resp = [
-            'memoName' => $infoNet['memo_name'],
-            'warnings' => [],
-            'operating' => $operating,
-            'contract' => $infoAn['contract'],
-            'minAmount' => $this -> an -> getMinWithdrawalAmount($pairing['assetid'], $pairing['netid']),
-            'prec' => $infoAn['prec'],
-            'feeMin' => trimFloat($dFeeMin -> toFixed($infoAn['prec'])),
-            'feeMax' => trimFloat($dFeeMax -> toFixed($infoAn['prec']))
-        ];
-        
-        // Warnings
-        if($infoNet['withdrawal_warning'] !== null)
-            $resp['warnings'][] = $infoNet['withdrawal_warning'];
-        if($infoAn['withdrawal_warning'] !== null)
-            $resp['warnings'][] = $infoAn['withdrawal_warning'];
-        
-        return $resp;
+            $dFeeBase = new Decimal($infoAn['wd_fee_base']);
+            
+            $dFeeMin = new Decimal($infoAn['wd_fee_min']);
+            $dFeeMin += $dFeeBase;
+            
+            $dFeeMax = new Decimal($infoAn['wd_fee_max']);
+            $dFeeMax += $dFeeBase;
+                    
+            $resp = [
+                'memoName' => $infoNet['memo_name'],
+                'warnings' => [],
+                'operating' => $infoIo['operating'],
+                'contract' => $infoAn['contract'],
+                'minAmount' => $minAmount,
+                'prec' => $infoAn['prec'],
+                'feeMin' => trimFloat($dFeeMin -> toFixed($infoAn['prec'])),
+                'feeMax' => trimFloat($dFeeMax -> toFixed($infoAn['prec']))
+            ];
+            
+            // Warnings
+            if($infoNet['withdrawal_warning'] !== null)
+                $resp['warnings'][] = $infoNet['withdrawal_warning'];
+            if($infoAn['withdrawal_warning'] !== null)
+                $resp['warnings'][] = $infoAn['withdrawal_warning'];
+            
+            return $resp;
+        });
     }
 }
 

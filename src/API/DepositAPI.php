@@ -7,8 +7,9 @@ class DepositAPI {
     private $pdo;
     private $an;
     
-    function __construct($log, $pdo, $an) {
+    function __construct($log, $amqp, $pdo, $an) {
         $this -> log = $log;
+        $this -> amqp = $amqp;
         $this -> pdo = $pdo;
         $this -> an = $an;
         
@@ -20,6 +21,8 @@ class DepositAPI {
     }
     
     public function deposit($path, $query, $body, $auth) {
+        $th = $this;
+        
         if(!$auth)
             throw new Error('UNAUTHORIZED', 'Unauthorized', 401);
         
@@ -68,129 +71,66 @@ class DepositAPI {
         if($infoAn['block_deposits_msg'] !== null)
             throw new Error('FORBIDDEN', $infoAn['block_deposits_msg'], 403);
         
-        // Get / set address
+        // Get minimal amount
         
-        $this -> pdo -> beginTransaction();
+        $minAmount = $this -> an -> getMinDepositAmount($pairing['assetid'], $pairing['netid']);
         
-        $task = [
-            ':netid' => $pairing['netid'],
-            ':uid' => $auth['uid']
-        ];
+        // Get info from wallet.io
         
-        $sql = 'SELECT shardid,
-                       address,
-                       memo
-                FROM deposit_addr
-                WHERE uid = :uid
-                AND netid = :netid
-                FOR UPDATE';
-        
-        $q = $this -> pdo -> prepare($sql);
-        $q -> execute($task);
-        $infoAddr = $q -> fetch();
-        
-        if(!$infoAddr) {
-            $task = [
-                ':netid' => $pairing['netid'],
-                ':uid' => $auth['uid']
+        return $this -> amqp -> call(
+            'wallet.io',
+            'getDepositContext',
+            [
+                'uid' => $auth['uid'],
+                'netid' => $pairing['netid']
+            ]
+        ) -> then(function($infoIo) use($infoNet, $infoAn, $minAmount) {
+            // Prepare response
+                
+            $resp = [
+                'confirmTarget' => $infoNet['confirms_target'],
+                'memoName' => null,
+                'memo' => null,
+                'qrCode' => null,
+                'warnings' => [],
+                'operating' => $infoIo['operating'],
+                'contract' => $infoAn['contract'],
+                'address' => $infoIo['address'],
+                'minAmount' => $minAmount
             ];
             
-            $sql = 'UPDATE deposit_addr
-                    SET uid = :uid
-                    WHERE addrid IN (
-                        SELECT addrid
-                        FROM deposit_addr
-                        WHERE netid = :netid
-                        AND uid IS NULL
-                        LIMIT 1
-                    )
-                    RETURNING shardid,
-                              address,
-                              memo';
-            
-            $q = $this -> pdo -> prepare($sql);
-            $q -> execute($task);
-            $infoAddr = $q -> fetch();
-            
-            if(!$infoAddr) {
-                $this -> pdo -> rollBack();
-                throw new Error('ASSIGN_ADDR_FAILED', 'Unable to assign new deposit address. Please try again later.', 500);
+            // Memo only if both set
+            if($infoNet['memo_name'] !== null && $infoIo['memo'] !== null) {
+                $resp['memoName'] = $infoNet['memo_name'];
+                $resp['memo'] = $infoIo['memo'];
             }
-        }
-        
-        $this -> pdo -> commit();
-        
-        // Get shard details
-        
-        $task = [
-            ':shardid' => $infoAddr['shardid']
-        ];
-        
-        $sql = 'SELECT wallet_shards.deposit_warning,
-                       wallet_shards.block_deposits_msg,
-                       EXTRACT(epoch FROM MAX(wallet_nodes.last_ping)) AS last_ping
-                FROM wallet_shards,
-                     wallet_nodes
-                WHERE wallet_nodes.shardid = wallet_shards.shardid
-                AND wallet_shards.shardid = :shardid
-                GROUP BY wallet_shards.shardid';
-        
-        $q = $this -> pdo -> prepare($sql);
-        $q -> execute($task);
-        $infoShard = $q -> fetch();
-        
-        if($infoShard['block_deposits_msg'] !== null)
-            throw new Error('FORBIDDEN', $infoShard['block_deposits_msg'], 403);
-        
-        $operating = time() - intval($infoShard['last_ping']) <= 5 * 60;
-        
-        // Prepare response
-                
-        $resp = [
-            'confirmTarget' => $infoNet['confirms_target'],
-            'memoName' => null,
-            'memo' => null,
-            'qrCode' => null,
-            'warnings' => [],
-            'operating' => $operating,
-            'contract' => $infoAn['contract'],
-            'address' => $infoAddr['address'],
-            'memo' => null,
-            'minAmount' => $this -> an -> getMinDepositAmount($pairing['assetid'], $pairing['netid'])
-        ];
-        
-        // Memo only if both set
-        if($infoNet['memo_name'] !== null && $infoAddr['memo'] !== null) {
-            $resp['memoName'] = $infoNet['memo_name'];
-            $resp['memo'] = $infoAddr['memo'];
-        }
-        
-        // Qr code for native
-        if($infoAn['contract'] === NULL && $infoNet['native_qr_format'] !== NULL) {
-            $qrContent = $infoNet['native_qr_format'];
-            $qrContent = str_replace('{{ADDRESS}}', $infoAddr['address'], $qrContent);
-            $qrContent = str_replace('{{MEMO}}', $infoAddr['memo'], $qrContent);
-            $resp['qrCode'] = $qrContent;
-        }
-        
-        // Qr code for token
-        else if($infoAn['contract'] !== NULL && $infoNet['token_qr_format'] !== NULL) {
-            $qrContent = $infoNet['token_qr_format'];
-            $qrContent = str_replace('{{ADDRESS}}', $infoAddr['address'], $qrContent);
-            $qrContent = str_replace('{{MEMO}}', $infoAddr['memo'], $qrContent);
-            $qrContent = str_replace('{{CONTRACT}}', $infoAn['contract'], $qrContent);
-            $resp['qrCode'] = $qrContent;
-        }
-        
-        // Warnings
-        if($infoNet['deposit_warning'] !== null)
-            $resp['warnings'][] = $infoNet['deposit_warning'];
-        if($infoAn['deposit_warning'] !== null)
-            $resp['warnings'][] = $infoAn['deposit_warning'];
-        if($infoShard['deposit_warning'] !== null)
-            $resp['warnings'][] = $infoShard['deposit_warning'];
-        
-        return $resp;
+            
+            // Qr code for native
+            if($infoAn['contract'] === NULL && $infoNet['native_qr_format'] !== NULL) {
+                $qrContent = $infoNet['native_qr_format'];
+                $qrContent = str_replace('{{ADDRESS}}', $infoIo['address'], $qrContent);
+                $qrContent = str_replace('{{MEMO}}', $infoIo['memo'], $qrContent);
+                $resp['qrCode'] = $qrContent;
+            }
+            
+            // Qr code for token
+            else if($infoAn['contract'] !== NULL && $infoNet['token_qr_format'] !== NULL) {
+                $qrContent = $infoNet['token_qr_format'];
+                $qrContent = str_replace('{{ADDRESS}}', $infoIo['address'], $qrContent);
+                $qrContent = str_replace('{{MEMO}}', $infoIo['memo'], $qrContent);
+                $qrContent = str_replace('{{CONTRACT}}', $infoAn['contract'], $qrContent);
+                $resp['qrCode'] = $qrContent;
+            }
+            
+            // Warnings
+            if($infoNet['deposit_warning'] !== null)
+                $resp['warnings'][] = $infoNet['deposit_warning'];
+            if($infoAn['deposit_warning'] !== null)
+                $resp['warnings'][] = $infoAn['deposit_warning'];
+            $resp['warnings'] = array_merge($resp['warnings'], $infoIo['warnings']);
+            
+            return $resp;
+        });
     }
 }
 

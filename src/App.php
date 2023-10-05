@@ -95,12 +95,14 @@ class App extends Infinex\App\App {
         
         $this -> depositApi = new DepositAPI(
             $this -> log,
+            $this -> amqp,
             $this -> pdo,
             $this -> an
         );
         
         $this -> withdrawalApi = new WithdrawalAPI(
             $this -> log,
+            $this -> amqp,
             $this -> pdo,
             $this -> an
         );
