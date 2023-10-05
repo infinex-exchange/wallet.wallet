@@ -133,6 +133,7 @@ class WithdrawalAPI {
             'wallet.io',
             'validateWithdrawalTarget',
             [
+                'netid' => $netid,
                 'address' => isset($body['address']) ? $body['address'] : null,
                 'memo' => isset($body['memo']) ? $body['memo'] : null
             ]
