@@ -132,3 +132,5 @@ create table wallet_nodes(
     foreign key(netid) references networks(netid),
     foreign key(shardid) references wallet_shards(shardid)
 );
+
+GRANT SELECT, UPDATE ON wallet_nodes TO "wallet.wallet";
