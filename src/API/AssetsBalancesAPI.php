@@ -27,23 +27,66 @@ class AssetsBalancesAPI {
     }
     
     public function getAllAssets($path, $query, $body, $auth) {
-        return $this -> commonGetAll(false, $path, $query, $body, $auth);
+        $pag = new Pagination\Offset(50, 500, $query);
+        $search = new Search(
+            [
+                'assetid',
+                'name'
+            ],
+            $query
+        );
+        
+        $task = [];
+        $search -> updateTask($task);
+        
+        $sql = 'SELECT assetid,
+                       name,
+                       icon_url,
+                       default_prec,
+                FROM assets
+                WHERE enabled = TRUE'
+             . $search -> sql()
+             .' ORDER BY assetid ASC'
+             . $pag -> sql();
+        
+        $q = $this -> pdo -> prepare($sql);
+        $q -> execute($task);
+        
+        $assets = [];
+        
+        while($row = $q -> fetch()) {
+            if($pag -> iter()) break;
+            $assets[] = $this -> assetRowToRespItem($row);
+        }
+        
+        return [
+            'assets' => $assets
+        ];
     }
     
     public function getAsset($path, $query, $body, $auth) {
-        return $this -> commonGet(false, $path, $query, $body, $auth);
+        $assetid = $this -> assets -> symbolToAssetId($path['symbol'], false);
+        
+        $task = [
+            ':assetid' => $assetid
+        ];
+        
+        $sql = 'SELECT assetid,
+                       name,
+                       icon_url,
+                       default_prec
+                FROM assets
+                WHERE enabled = TRUE
+                AND assetid = :assetid';
+        
+        $q = $this -> pdo -> prepare($sql);
+        $q -> execute($task);
+        
+        return $this -> assetRowToRespItem($q -> fetch());
     }
     
     public function getAllBalances($path, $query, $body, $auth) {
-        return $this -> commonGetAll(true, $path, $query, $body, $auth);
-    }
-    
-    public function getBalance($path, $query, $body, $auth) {
-        return $this -> commonGet(true, $path, $query, $body, $auth);
-    }
-    
-    private function commonGetAll($balances, $path, $query, $body, $auth) {
-        if($balances && !$auth)
+        if(!$auth)
             throw new Error('UNAUTHORIZED', 'Unauthorized', 401);
         
         $pag = new Pagination\Offset(50, 500, $query);
@@ -55,100 +98,70 @@ class AssetsBalancesAPI {
             $query
         );
         
-        $task = [];
+        $task = [
+            ':uid' => $auth['uid']
+        ];
         $search -> updateTask($task);
         
         $sql = 'SELECT assets.assetid,
                        assets.name,
                        assets.icon_url,
-                       assets.default_prec,
-                       MAX(asset_network.prec) AS max_prec
-                FROM assets,
-                     asset_network
-                WHERE asset_network.assetid = assets.assetid
-                AND assets.enabled = TRUE'
-             . $search -> sql()
-             .' GROUP BY assets.assetid
-                ORDER BY assets.assetid ASC'
-             . $pag -> sql();
+                       assets.default_prec
+                FROM assets
+                LEFT JOIN wallet_balances ON wallet_balances.assetid = assets.assetid
+                WHERE assets.enabled = TRUE
+                AND wallet_balances.uid = :uid';
         
-        if($balances) {
-            $task[':uid'] = $auth['uid'];
-            
-            $sql = 'SELECT inn.*,
-                           wallet_balances.total,
-                           wallet_balances.locked
-                    FROM ('
-                 . $sql
-                 .' ) AS inn
-                    LEFT JOIN wallet_balances ON wallet_balances.assetid = inn.assetid
-                    WHERE wallet_balances.uid = :uid';
-            
-            if(isset($query['nonZero']))
-                $sql .= ' AND wallet_balances.total IS NOT NULL
-                          AND wallet_balances.total != 0';
-            
-            $sql .= ' ORDER BY inn.assetid ASC';
-        }
+        if(isset($query['nonZero']))
+            $sql .= ' AND wallet_balances.total IS NOT NULL
+                      AND wallet_balances.total != 0';
+        
+        $sql .= $search -> sql()
+             . ' ORDER BY assets.assetid ASC'
+             . $pag -> sql();
         
         $q = $this -> pdo -> prepare($sql);
         $q -> execute($task);
         
-        $items = [];
+        $balances = [];
         
         while($row = $q -> fetch()) {
             if($pag -> iter()) break;
-            $items[] = $this -> commonRowToRespItem($balances, $row);
+            $balances[] = array_merge(
+                $this -> assetRowToRespItem($row),
+                $this -> balanceRowtoRespItem($row)
+            );
         }
         
-        $resp = [];
-        if($balances)
-            $resp['balances'] = $items;
-        else
-            $resp['assets'] = $items;
-        $resp['more'] = $pag -> more;
-        return $resp;
+        return [
+            'balances' => $balances
+        ];
     }
     
-    private function commonGet($balances, $path, $query, $body, $auth) {
-        if($balances && !$auth)
+    public function getBalance($path, $query, $body, $auth) {
+        if(!$auth)
             throw new Error('UNAUTHORIZED', 'Unauthorized', 401);
         
         $assetid = $this -> assets -> symbolToAssetId($path['symbol'], false);
         
         $task = [
+            ':uid' => $auth['uid'],
             ':assetid' => $assetid
         ];
         
         $sql = 'SELECT assets.assetid,
                        assets.name,
                        assets.icon_url,
-                       assets.default_prec,
-                       assets.enabled,
-                       MAX(asset_network.prec) AS max_prec
-                FROM assets,
-                     asset_network
-                WHERE asset_network.assetid = assets.assetid
+                       assets.default_prec
+                FROM assets
+                LEFT JOIN wallet_balances ON wallet_balances.assetid = assets.assetid
+                WHERE assets.enabled = TRUE
                 AND assets.assetid = :assetid
-                GROUP BY assets.assetid';
+                AND wallet_balances.uid = :uid';
         
-        if($balances) {
-            $task[':uid'] = $auth['uid'];
-            
-            $sql = 'SELECT inn.*,
-                           wallet_balances.total,
-                           wallet_balances.locked
-                    FROM ('
-                 . $sql
-                 .' ) AS inn
-                    LEFT JOIN wallet_balances ON wallet_balances.assetid = inn.assetid
-                    WHERE wallet_balances.uid = :uid';
-            
-            if(isset($query['nonZero']))
-                $sql .= ' AND wallet_balances.total IS NOT NULL
-                          AND wallet_balances.total != 0';
-            
-        }
+        if(isset($query['nonZero']))
+            $sql .= ' AND wallet_balances.total IS NOT NULL
+                      AND wallet_balances.total != 0';
         
         $q = $this -> pdo -> prepare($sql);
         $q -> execute($task);
@@ -157,35 +170,39 @@ class AssetsBalancesAPI {
         if(!$row)
             throw new Error('NOT_FOUND', 'Empty balance for asset '.$path['symbol'], 404);
         
-        return $this -> commonRowToRespItem($balances, $row);
+        return array_merge(
+            $this -> assetRowToRespItem($row),
+            $this -> balanceRowToRespItem($row)
+        );
     }
     
-    private function commonRowToRespItem($balances, $row) {
-        $item = [
+    private function assetRowToRespItem($row) {
+        return [
             'symbol' => $row['assetid'],
             'name' => $row['name'],
             'iconUrl' => $row['icon_url'],
             'defaultPrec' => $row['default_prec'],
             'maxPrec' => $row['max_prec']
         ];
-            
-        if($balances) {
-            if($row['total'] == null) {
-                $item['total'] = '0';
-                $item['locked'] = '0';
-                $item['avbl'] = '0';
-            } else {
-                $dTotal = new Decimal($row['total']);
-                $dLocked = new Decimal($row['locked']);
-                $dAvbl = $dTotal - $dLocked;
-                
-                $item['total'] = trimFloat($row['total']);
-                $item['locked'] = trimFloat($row['locked']);
-                $item['avbl'] = trimFloat($dAvbl -> toFixed($row['max_prec']));
-            }
-        }
+    }
     
-        return $item;
+    private function balanceRowToRespItem($row) {
+        if($row['total'] == null)
+            return [
+                'total' => '0',
+                'locked' => '0',
+                'avbl' => '0'
+            ];
+        
+        $dTotal = new Decimal($row['total']);
+        $dLocked = new Decimal($row['locked']);
+        $dAvbl = $dTotal - $dLocked;
+        
+        return [
+            'total' => trimFloat($row['total']),
+            'locked' => trimFloat($row['locked']),
+            'avbl' => trimFloat($dAvbl -> toFixed(32))
+        ];
     }
 }
 
