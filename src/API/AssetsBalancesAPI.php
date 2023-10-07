@@ -60,7 +60,8 @@ class AssetsBalancesAPI {
         }
         
         return [
-            'assets' => $assets
+            'assets' => $assets,
+            'more' => $pag -> more
         ];
     }
     
@@ -136,7 +137,8 @@ class AssetsBalancesAPI {
         }
         
         return [
-            'balances' => $balances
+            'balances' => $balances,
+            'more' => $pag -> more
         ];
     }
     
