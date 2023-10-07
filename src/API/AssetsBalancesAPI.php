@@ -106,7 +106,9 @@ class AssetsBalancesAPI {
         $sql = 'SELECT assets.assetid,
                        assets.name,
                        assets.icon_url,
-                       assets.default_prec
+                       assets.default_prec,
+                       wallet_balances.total,
+                       wallet_balances.locked
                 FROM assets
                 LEFT JOIN wallet_balances ON wallet_balances.assetid = assets.assetid
                 WHERE assets.enabled = TRUE
@@ -152,7 +154,9 @@ class AssetsBalancesAPI {
         $sql = 'SELECT assets.assetid,
                        assets.name,
                        assets.icon_url,
-                       assets.default_prec
+                       assets.default_prec,
+                       wallet_balances.total,
+                       wallet_balances.locked
                 FROM assets
                 LEFT JOIN wallet_balances ON wallet_balances.assetid = assets.assetid
                 WHERE assets.enabled = TRUE
