@@ -42,7 +42,7 @@ class AssetsBalancesAPI {
         $sql = 'SELECT assetid,
                        name,
                        icon_url,
-                       default_prec,
+                       default_prec
                 FROM assets
                 WHERE enabled = TRUE'
              . $search -> sql()
