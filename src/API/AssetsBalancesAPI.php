@@ -181,8 +181,7 @@ class AssetsBalancesAPI {
             'symbol' => $row['assetid'],
             'name' => $row['name'],
             'iconUrl' => $row['icon_url'],
-            'defaultPrec' => $row['default_prec'],
-            'maxPrec' => $row['max_prec']
+            'prec' => $row['default_prec']
         ];
     }
     
