@@ -1,18 +1,21 @@
 <?php
 
 use Infinex\Exceptions\Error;
+use function Infinex\Math\validateFloat;
 use React\Promise;
 
 class CreditDebit {
     private $log;
     private $amqp;
     private $pdo;
+    private $asb;
     private $wlog;
     
-    function __construct($log, $amqp, $pdo, $wlog) {
+    function __construct($log, $amqp, $pdo, $asb, $wlog) {
         $this -> log = $log;
         $this -> amqp = $amqp;
         $this -> pdo = $pdo;
+        $this -> asb = $asb;
         $this -> wlog = $wlog;
         
         $this -> log -> debug('Initialized credit / debit');
@@ -25,28 +28,12 @@ class CreditDebit {
         
         $promises[] = $this -> amqp -> method(
             'credit',
-            function($body) use($th) {
-                return $th -> credit(
-                    $body['uid'],
-                    $body['assetid'],
-                    $body['amount'],
-                    $body['reason'],
-                    isset($body['context']) ? $body['context'] : null
-                );
-            }
+            [$this, 'credit']
         );
         
         $promises[] = $this -> amqp -> method(
             'debit',
-            function($body) use($th) {
-                return $th -> debit(
-                    $body['uid'],
-                    $body['assetid'],
-                    $body['amount'],
-                    $body['reason'],
-                    isset($body['context']) ? $body['context'] : null
-                );
-            }
+            [$this, 'debit']
         );
         
         return Promise\all($promises) -> then(
@@ -80,13 +67,25 @@ class CreditDebit {
         );
     }
     
-    public function credit($uid, $assetid, $amount, $reason, $context) {
+    public function credit($body) {
+        if(!isset($body['uid']))
+            throw new Error('MISSING_DATA', 'uid');
+        if(!isset($body['amount']))
+            throw new Error('MISSING_DATA', 'amount', 400);
+        
+        if(!validateFloat($body['amount']))
+            throw new Error('VALIDATION_ERROR', 'amount', 400);
+        
+        $this -> asb -> assetIdToSymbol([
+            'assetid' => @$body['assetid']
+        ]);
+        
         $this -> pdo -> beginTransaction();
         
         $task = array(
-            ':uid' => $uid,
-            ':assetid' => $assetid,
-            ':amount' => $amount
+            ':uid' => $body['uid'],
+            ':assetid' => $body['assetid'],
+            ':amount' => $body['amount']
         );
         
         $sql = 'UPDATE wallet_balances
@@ -119,24 +118,36 @@ class CreditDebit {
             $this -> pdo,
             'CREDIT',
             null,
-            $uid,
-            $assetid,
-            $amount,
-            $reason,
-            $context
+            $body['uid'],
+            $body['assetid'],
+            $body['amount'],
+            @$body['reason'],
+            @$body['context']
         );
         
         $this -> pdo -> commit();
     }
     
-    public function debit($uid, $assetid, $amount, $reason, $context) {
+    public function debit($body) {
+        if(!isset($body['uid']))
+            throw new Error('MISSING_DATA', 'uid');
+        if(!isset($body['amount']))
+            throw new Error('MISSING_DATA', 'amount', 400);
+        
+        if(!validateFloat($body['amount']))
+            throw new Error('VALIDATION_ERROR', 'amount', 400);
+        
+        $this -> asb -> assetIdToSymbol([
+            'assetid' => @$body['assetid']
+        ]);
+        
         $this -> pdo -> beginTransaction();
         
         $task = array(
-            ':uid' => $uid,
-            ':assetid' => $assetid,
-            ':amount' => $amount,
-            ':amount2' => $amount
+            ':uid' => $body['uid'],
+            ':assetid' => $body['assetid'],
+            ':amount' => $body['amount']
+            ':amount2' => $body['amount']
         );
         
         $sql = 'UPDATE wallet_balances
@@ -159,11 +170,11 @@ class CreditDebit {
             $this -> pdo,
             'DEBIT',
             null,
-            $uid,
-            $assetid,
-            $amount,
-            $reason,
-            $context
+            $body['uid'],
+            $body['assetid'],
+            $body['amount'],
+            @$body['reason'],
+            @$body['context']
         );
         
         $this -> pdo -> commit();

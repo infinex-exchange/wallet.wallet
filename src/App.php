@@ -1,7 +1,7 @@
 <?php
 
+require __DIR__.'/AssetsBalances.php';
 require __DIR__.'/WalletLog.php';
-require __DIR__.'/Assets.php';
 require __DIR__.'/CreditDebit.php';
 require __DIR__.'/LockMgr.php';
 
@@ -12,8 +12,8 @@ use React\Promise;
 class App extends Infinex\App\App {
     private $pdo;
     
+    private $asb;
     private $wlog;
-    private $assets;
     private $cd;
     private $locks;
     
@@ -32,34 +32,35 @@ class App extends Infinex\App\App {
             DB_NAME
         );
         
-        $this -> wlog = new WalletLog(
-            $this -> log
-        );
-        
-        $this -> assets = new Assets(
+        $this -> asb = new AssetsBalances(
             $this -> log,
             $this -> amqp,
             $this -> pdo
+        );
+        
+        $this -> wlog = new WalletLog(
+            $this -> log
         );
         
         $this -> cd = new CreditDebit(
             $this -> log,
             $this -> amqp,
             $this -> pdo,
+            $this -> asb,
             $this -> wlog
         );
-        
+       
         $this -> lockMgr = new LockMgr(
             $this -> log,
             $this -> amqp,
             $this -> pdo,
+            $this -> asb,
             $this -> wlog
         );
         
         $this -> asbApi = new AssetsBalancesAPI(
             $this -> log,
-            $this -> pdo,
-            $this -> assets
+            $this -> asb
         );
         
         $this -> rest = new Infinex\API\REST(
@@ -80,8 +81,11 @@ class App extends Infinex\App\App {
             }
         ) -> then(
             function() use($th) {
+                return $th -> asb -> start();
+            }
+        ) -> then(
+            function() use($th) {
                 return Promise\all([
-                    $th -> assets -> start(),
                     $th -> cd -> start(),
                     $th -> lockMgr -> start()
                 ]);
@@ -103,10 +107,13 @@ class App extends Infinex\App\App {
         $this -> rest -> stop() -> then(
             function() use($th) {
                 return Promise\all([
-                    $th -> assets -> stop(),
                     $th -> cd -> stop(),
                     $th -> lockMgr -> stop()
                 ]);
+            }
+        ) -> then(
+            function() use($th) {
+                return $th -> asb -> stop();
             }
         ) -> then(
             function() use($th) {

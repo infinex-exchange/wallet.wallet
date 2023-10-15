@@ -27,15 +27,16 @@ GRANT SELECT, UPDATE, INSERT ON wallet_balances TO "wallet.wallet";
 
 create table wallet_locks(
     lockid bigserial not null primary key,
-    type varchar(32) not null,
     uid bigint not null,
     assetid varchar(32) not null,
     amount decimal(65, 32) not null,
+    reason varchar(64) not null,
+    context varchar(255) default null,
     
     foreign key(assetid) references assets(assetid)
 );
 
-GRANT SELECT, INSERT, DELETE ON wallet_locks TO "wallet.wallet";
+GRANT SELECT, INSERT, UPDATE, DELETE ON wallet_locks TO "wallet.wallet";
 GRANT SELECT, USAGE ON wallet_locks_lockid_seq TO "wallet.wallet";
 
 create table wallet_log(
