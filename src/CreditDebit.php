@@ -70,6 +70,8 @@ class CreditDebit {
     public function credit($body) {
         if(!isset($body['uid']))
             throw new Error('MISSING_DATA', 'uid');
+        if(!isset($body['reason']))
+            throw new Error('MISSING_DATA', 'reason');
         if(!isset($body['amount']))
             throw new Error('MISSING_DATA', 'amount', 400);
         
@@ -121,7 +123,7 @@ class CreditDebit {
             $body['uid'],
             $body['assetid'],
             $body['amount'],
-            @$body['reason'],
+            $body['reason'],
             @$body['context']
         );
         
@@ -131,6 +133,8 @@ class CreditDebit {
     public function debit($body) {
         if(!isset($body['uid']))
             throw new Error('MISSING_DATA', 'uid');
+        if(!isset($body['reason']))
+            throw new Error('MISSING_DATA', 'reason');
         if(!isset($body['amount']))
             throw new Error('MISSING_DATA', 'amount', 400);
         
@@ -173,7 +177,7 @@ class CreditDebit {
             $body['uid'],
             $body['assetid'],
             $body['amount'],
-            @$body['reason'],
+            $body['reason'],
             @$body['context']
         );
         
