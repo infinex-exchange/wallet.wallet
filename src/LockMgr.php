@@ -197,7 +197,7 @@ class LockMgr {
         ];
     }
     
-    private function release($body) {
+    public function release($body) {
         if(!isset($body['lockid']))
             throw new Error('MISSING_DATA', 'lockid');
         if(!isset($body['reason']))
