@@ -115,7 +115,7 @@ class LockMgr {
                     FOR UPDATE';
             
             $q = $this -> pdo -> prepare($sql);
-            $this -> pdo -> execute($task);
+            $q -> execute($task);
             $row = $q -> fetch();
             
             if(!$row) {
