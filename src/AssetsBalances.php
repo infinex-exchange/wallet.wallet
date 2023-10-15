@@ -318,8 +318,8 @@ class AssetsBalances {
             'iconUrl' => $row['icon_url'],
             'defaultPrec' => $row['default_prec'],
             'enabled' => $row['enabled'],
-            'minDeposit' => trimFloat($row['minDeposit']),
-            'minWithdrawal' => trimFloat($row['minWithdrawal'])
+            'minDeposit' => trimFloat($row['min_deposit']),
+            'minWithdrawal' => trimFloat($row['min_withdrawal'])
         ];
     }
     
