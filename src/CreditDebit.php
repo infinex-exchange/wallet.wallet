@@ -146,7 +146,7 @@ class CreditDebit {
         $task = array(
             ':uid' => $body['uid'],
             ':assetid' => $body['assetid'],
-            ':amount' => $body['amount']
+            ':amount' => $body['amount'],
             ':amount2' => $body['amount']
         );
         
