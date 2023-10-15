@@ -253,7 +253,7 @@ class AssetsBalances {
             $sql .= ' AND assets.enabled = :enabled';
         }
         
-        if(isset($query['nonZero']))
+        if(isset($body['nonZero']))
             $sql .= ' AND wallet_balances.total IS NOT NULL
                       AND wallet_balances.total != 0';
         
