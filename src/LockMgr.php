@@ -176,7 +176,7 @@ class LockMgr {
         $q = $this -> pdo -> prepare($sql);
         $q -> execute($task);
         $row = $q -> fetch();
-        $lockid = $row['lockid']
+        $lockid = $row['lockid'];
         
         $this -> wlog -> insert(
             $this -> pdo,
