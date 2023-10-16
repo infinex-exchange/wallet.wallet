@@ -143,6 +143,8 @@ class AssetsBalances {
                 throw new Error('VALIDATION_ERROR', 'symbol', 400);
             $dispAsset = $body['symbol'];
         }
+        else
+            throw new Error('MISSING_DATA', 'assetid or symbol');
         
         $task = [];
         
