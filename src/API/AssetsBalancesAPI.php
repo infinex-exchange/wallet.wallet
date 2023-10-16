@@ -33,14 +33,12 @@ class AssetsBalancesAPI {
     }
     
     public function getAsset($path, $query, $body, $auth) {
-        $assetid = $this -> asb -> symbolToAssetId([
-            'symbol' => @$body['symbol'],
-            'enabled' => true
+        $asset = $this -> asb -> getAsset([
+            'symbol' => @$body['symbol']
         ]);
         
-        $asset = $this -> asb -> getAsset([
-            'assetid' => $assetid
-        ]);
+        if(!$asset['enabled'])
+            throw new Error('FORBIDDEN', 'Asset '.$body['symbol'].' is out of service', 403);
         
         return $this -> ptpAsset($asset);
     }
@@ -55,7 +53,7 @@ class AssetsBalancesAPI {
             'offset' => @$query['offset'],
             'limit' => @$query['limit'],
             'q' => @$query['q'],
-            'nonZero' => @$query['nonZero']
+            'nonZero' => isset($query['nonZero'])
         ]);
         
         foreach($resp['balances'] as $k => $v)
@@ -64,21 +62,23 @@ class AssetsBalancesAPI {
         return $resp;
     }
     
-    public function getSession($path, $query, $body, $auth) {
+    public function getBalance($path, $query, $body, $auth) {
         if(!$auth)
             throw new Error('UNAUTHORIZED', 'Unauthorized', 401);
         
-        $assetid = $this -> asb -> symbolToAssetId([
+        $asset = $this -> asb -> getAsset([
             'symbol' => @$body['symbol'],
-            'enabled' => true
         ]);
         
-        return $this -> ptpBalance(
-            $this -> asb -> getBalance([
-                'uid' => $auth['uid'],
-                'assetid' => $assetid
-            ])
-        );
+        if(!$asset['enabled'])
+            throw new Error('FORBIDDEN', 'Asset '.$body['symbol'].' is out of service', 403);
+        
+        $balance = $this -> asb -> getBalance([
+            'uid' => $auth['uid'],
+            'assetid' => $asset['assetid']
+        ]);
+        
+        return $this -> ptpBalance($balance);
     }
     
     private function ptpAsset($record) {

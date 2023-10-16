@@ -1,6 +1,7 @@
 <?php
 use Infinex\Exceptions\Error;
-use function Infinex\Math\validateFloat;
+use function Infinex\Validation\validateId;
+use function Infinex\Validation\validateFloat;
 use function Infinex\Math\trimFloat;
 use React\Promise;
 use Decimal\Decimal;
@@ -85,11 +86,17 @@ class LockMgr {
             throw new Error('MISSING_DATA', 'uid');
         if(!isset($body['reason']))
             throw new Error('MISSING_DATA', 'reason');
+        if(!isset($body['amount']))
+            throw new Error('MISSING_DATA', 'amount', 400);
         
-        if(isset($body['amount']) && !validateFloat($body['amount']))
+        if(!validateId($body['uid']))
+            throw new Error('VALIDATION_ERROR', 'uid');
+        if(!is_string($body['reason']))
+            throw new Error('VALIDATION_ERROR', 'reason');
+        if(!validateFloat($body['amount']))
             throw new Error('VALIDATION_ERROR', 'amount', 400);
         
-        $this -> asb -> assetIdToSymbol([
+        $this -> asb -> getAsset([
             'assetid' => @$body['assetid']
         ]);
         
@@ -203,8 +210,10 @@ class LockMgr {
         if(!isset($body['reason']))
             throw new Error('MISSING_DATA', 'reason');
         
-        if(!$this -> validateLockid($body['lockid']))
+        if(!validateId($body['lockid']))
             throw new Error('VALIDATION_ERROR', 'lockid');
+        if(!is_string($body['reason']))
+            throw new Error('VALIDATION_ERROR', 'reason');
         
         $this -> pdo -> beginTransaction();
         
@@ -268,8 +277,10 @@ class LockMgr {
         if(!isset($body['reason']))
             throw new Error('MISSING_DATA', 'reason');
         
-        if(!$this -> validateLockid($body['lockid']))
+        if(!validateId($body['lockid']))
             throw new Error('VALIDATION_ERROR', 'lockid');
+        if(!is_string($body['reason']))
+            throw new Error('VALIDATION_ERROR', 'reason');
         
         $this -> pdo -> beginTransaction();
         
@@ -335,10 +346,14 @@ class LockMgr {
         if(!isset($body['reason']))
             throw new Error('MISSING_DATA', 'reason');
         
-        if(!$this -> validateLockid($body['lockid']))
+        if(!validateId($body['lockid']))
             throw new Error('VALIDATION_ERROR', 'lockid');
+        if(!is_string($body['reason']))
+            throw new Error('VALIDATION_ERROR', 'reason');
         
-        if(isset($body['abs'])) {
+        if(isset($body['abs']) && isset($body['rel']))
+            throw new Error('ARGUMENTS_CONFLICT', 'Both abs and rel are set');
+        else if(isset($body['abs'])) {
             if(!validateFloat($body['abs']))
                 throw new Error('VALIDATION_ERROR', 'abs');
         }
@@ -435,12 +450,6 @@ class LockMgr {
         );
         
         $this -> pdo -> commit();
-    }
-    
-    private function validateLockid($lockid) {
-        if(!is_int($lockid)) return false;
-        if($lockid < 1) return false;
-        return true;
     }
 }
 

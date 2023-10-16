@@ -3,6 +3,7 @@
 use Infinex\Exceptions\Error;
 use Infinex\Pagination;
 use Infinex\Database\Search;
+use function Infinex\Validation\validateId;
 use function Infinex\Math\trimFloat;
 use React\Promise;
 use Decimal\Decimal;
@@ -24,16 +25,6 @@ class AssetsBalances {
         $th = $this;
         
         $promises = [];
-        
-        $promises[] = $this -> amqp -> method(
-            'symbolToAssetId',
-            [$this, 'symbolToAssetId']
-        );
-        
-        $promises[] = $this -> amqp -> method(
-            'assetIdToSymbol',
-            [$this, 'assetIdToSymbol']
-        );
         
         $promises[] = $this -> amqp -> method(
             'getAssets',
@@ -72,8 +63,6 @@ class AssetsBalances {
         
         $promises = [];
         
-        $promises[] = $this -> amqp -> unreg('symbolToAssetId');
-        $promises[] = $this -> amqp -> unreg('assetIdToSymbol');
         $promises[] = $this -> amqp -> unreg('getAssets');
         $promises[] = $this -> amqp -> unreg('getAsset');
         $promises[] = $this -> amqp -> unreg('getBalances');
@@ -90,50 +79,10 @@ class AssetsBalances {
         );
     }
     
-    public function symbolToAssetId($body) {
-        // Nonsense function, but very important for future changes
-        if(!isset($body['symbol']))
-            throw new Error('MISSING_DATA', 'symbol', 400);
-        
-        if(!$this -> validateAssetSymbol($symbol))
-            throw new Error('VALIDATION_ERROR', 'symbol', 400);
-            
-        $task = array(
-            ':symbol' => $symbol
-        );
-        
-        $sql = 'SELECT assetid,
-                       enabled
-                FROM assets
-                WHERE assetid = :symbol';
-        
-        if(isset($body['enabled'])) {
-            $task[':enabled'] = $body['enabled'] ? 1 : 0;
-            $sql .= ' AND enabled = :enabled';
-        }
-        
-        $q = $this -> pdo -> prepare($sql);
-        $q -> execute($task);
-        $row = $q -> fetch();
-            
-        if(!$row)
-            throw new Error('NOT_FOUND', 'Asset '.$symbol.' not found', 404);
-        
-        return $row['assetid'];
-    }
-    
-    public function assetIdToSymbol($body) {
-        // Nonsense function, but very important for future changes
-        if(!isset($body['assetid']))
-            throw new Error('MISSING_DATA', 'assetid');
-        
-        if(!$this -> validateAssetId($body['assetid']))
-            throw new Error('VALIDATION_ERROR', 'assetid');
-            
-        return $body['assetid'];
-    }
-    
     public function getAssets($body) {
+        if(isset($body['enabled']) && !is_bool($body['enabled']))
+            throw new Error('VALIDATION_ERROR', 'enabled');
+        
         $pag = new Pagination\Offset(50, 500, $body);
         $search = new Search(
             [
@@ -182,15 +131,20 @@ class AssetsBalances {
     }
     
     public function getAsset($body) {
-        if(!isset($body['assetid']))
-            throw new Error('MISSING_DATA', 'assetid');
+        if(isset($body['assetid']) && isset($body['symbol']))
+            throw new Error('ARGUMENTS_CONFLICT', 'Both assetid and symbol are set');
+        else if(isset($body['assetid'])) {
+            if(!$this -> validateAssetSymbol($body['assetid']))
+                throw new Error('VALIDATION_ERROR', 'assetid');
+            $dispAsset = $body['assetid'];
+        }
+        else if(isset($body['symbol'])) {
+            if(!$this -> validateAssetSymbol($body['symbol']))
+                throw new Error('VALIDATION_ERROR', 'symbol', 400);
+            $dispAsset = $body['symbol'];
+        }
         
-        if(!$this -> validateAssetId($body['assetid']))
-            throw new Error('VALIDATION_ERROR', 'assetid');
-        
-        $task = [
-            ':assetid' => $body['assetid']
-        ];
+        $task = [];
         
         $sql = 'SELECT assetid,
                        name,
@@ -199,12 +153,15 @@ class AssetsBalances {
                        enabled,
                        min_deposit,
                        min_withdrawal
-                FROM assets
-                WHERE assetid = :assetid';
+                FROM assets';
         
-        if(isset($body['enabled'])) {
-            $task[':enabled'] = $body['enabled'] ? 1 : 0;
-            $sql .= ' AND enabled = :enabled';
+        if(isset($body['assetid'])) {
+            $task[':assetid'] = $body['assetid'];
+            $sql .= ' WHERE assetid = :assetid';
+        }
+        else if(isset($body['symbol'])) {
+            $task[':symbol'] = $body['symbol'];
+            $sql .= ' WHERE assetid = :symbol';
         }
         
         $q = $this -> pdo -> prepare($sql);
@@ -212,7 +169,7 @@ class AssetsBalances {
         $row = $q -> fetch();
         
         if(!$row)
-            throw new Error('NOT_FOUND', 'Asset '.$body['assetid'].' not found');
+            throw new Error('NOT_FOUND', 'Asset '.$dispAsset.' not found', 404);
         
         return $this -> rtrAsset($row);
     }
@@ -220,6 +177,14 @@ class AssetsBalances {
     public function getBalances($body) {
         if(!isset($body['uid']))
             throw new Error('MISSING_DATA', 'uid');
+        
+        if(!validateId($body['uid']))
+            throw new Error('VALIDATION_ERROR', 'uid');
+        
+        if(isset($body['enabled']) && !is_bool($body['enabled']))
+            throw new Error('VALIDATION_ERROR', 'enabled');
+        if(isset($body['nonZero']) && !is_bool($body['nonZero']))
+            throw new Error('VALIDATION_ERROR', 'nonZero');
         
         $pag = new Pagination\Offset(50, 500, $body);
         $search = new Search(
@@ -253,7 +218,7 @@ class AssetsBalances {
             $sql .= ' AND assets.enabled = :enabled';
         }
         
-        if(isset($body['nonZero']))
+        if(@$body['nonZero'])
             $sql .= ' AND wallet_balances.total IS NOT NULL
                       AND wallet_balances.total != 0';
         
@@ -283,6 +248,9 @@ class AssetsBalances {
     public function getBalance($body) {
         if(!isset($body['uid']))
             throw new Error('MISSING_DATA', 'uid');
+        
+        if(!validateId($body['uid']))
+            throw new Error('VALIDATION_ERROR', 'uid');
         
         $asset = $this -> getAsset([
             'assetid' => @$body['assetid'],
@@ -340,10 +308,6 @@ class AssetsBalances {
             'locked' => trimFloat($row['locked']),
             'avbl' => trimFloat($dAvbl -> toFixed(32))
         ];
-    }
-    
-    private function validateAssetId($symbol) {
-        return preg_match('/^[A-Z0-9]{1,32}$/', $symbol);
     }
     
     private function validateAssetSymbol($symbol) {

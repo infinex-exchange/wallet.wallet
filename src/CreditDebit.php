@@ -1,7 +1,8 @@
 <?php
 
 use Infinex\Exceptions\Error;
-use function Infinex\Math\validateFloat;
+use function Infinex\Validation\validateId;
+use function Infinex\Validation\validateFloat;
 use React\Promise;
 
 class CreditDebit {
@@ -75,10 +76,14 @@ class CreditDebit {
         if(!isset($body['amount']))
             throw new Error('MISSING_DATA', 'amount', 400);
         
+        if(!validateId($body['uid']))
+            throw new Error('VALIDATION_ERROR', 'uid');
+        if(!is_string($body['reason']))
+            throw new Error('VALIDATION_ERROR', 'reason');
         if(!validateFloat($body['amount']))
             throw new Error('VALIDATION_ERROR', 'amount', 400);
         
-        $this -> asb -> assetIdToSymbol([
+        $this -> asb -> getAsset([
             'assetid' => @$body['assetid']
         ]);
         
@@ -94,7 +99,7 @@ class CreditDebit {
                 SET total = total + :amount
                 WHERE uid = :uid
                 AND assetid = :assetid
-                RETURNING uid';
+                RETURNING 1';
         
         $q = $this -> pdo -> prepare($sql);
         $q -> execute($task);
@@ -138,10 +143,14 @@ class CreditDebit {
         if(!isset($body['amount']))
             throw new Error('MISSING_DATA', 'amount', 400);
         
+        if(!validateId($body['uid']))
+            throw new Error('VALIDATION_ERROR', 'uid');
+        if(!is_string($body['reason']))
+            throw new Error('VALIDATION_ERROR', 'reason');
         if(!validateFloat($body['amount']))
             throw new Error('VALIDATION_ERROR', 'amount', 400);
         
-        $this -> asb -> assetIdToSymbol([
+        $this -> asb -> getAsset([
             'assetid' => @$body['assetid']
         ]);
         
