@@ -67,7 +67,7 @@ class AssetsBalancesAPI {
             throw new Error('UNAUTHORIZED', 'Unauthorized', 401);
         
         $asset = $this -> asb -> getAsset([
-            'symbol' => @$body['symbol'],
+            'symbol' => @$path['symbol'],
         ]);
         
         if(!$asset['enabled'])

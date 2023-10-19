@@ -144,7 +144,7 @@ class AssetsBalances {
             $dispAsset = $body['symbol'];
         }
         else
-            throw new Error('MISSING_DATA', 'assetid or symbol');
+            throw new Error('MISSING_DATA', 'assetid or symbol', 400);
         
         $task = [];
         
