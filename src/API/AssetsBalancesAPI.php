@@ -34,11 +34,11 @@ class AssetsBalancesAPI {
     
     public function getAsset($path, $query, $body, $auth) {
         $asset = $this -> asb -> getAsset([
-            'symbol' => @$body['symbol']
+            'symbol' => $path['symbol']
         ]);
         
         if(!$asset['enabled'])
-            throw new Error('FORBIDDEN', 'Asset '.$body['symbol'].' is out of service', 403);
+            throw new Error('FORBIDDEN', 'Asset '.$path['symbol'].' is out of service', 403);
         
         return $this -> ptpAsset($asset);
     }
@@ -67,11 +67,11 @@ class AssetsBalancesAPI {
             throw new Error('UNAUTHORIZED', 'Unauthorized', 401);
         
         $asset = $this -> asb -> getAsset([
-            'symbol' => @$path['symbol'],
+            'symbol' => $path['symbol'],
         ]);
         
         if(!$asset['enabled'])
-            throw new Error('FORBIDDEN', 'Asset '.$body['symbol'].' is out of service', 403);
+            throw new Error('FORBIDDEN', 'Asset '.$path['symbol'].' is out of service', 403);
         
         $balance = $this -> asb -> getBalance([
             'uid' => $auth['uid'],
