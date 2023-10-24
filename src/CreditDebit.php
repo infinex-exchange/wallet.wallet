@@ -105,7 +105,7 @@ class CreditDebit {
                     :amount
                 )
                 ON CONFLICT(uid, assetid) DO UPDATE
-                SET total = total + EXCLUDED.total';
+                SET total = wallet_balances.total + EXCLUDED.total';
         
         $q = $this -> pdo -> prepare($sql);
         $q -> execute($task);
