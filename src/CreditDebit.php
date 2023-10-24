@@ -95,31 +95,20 @@ class CreditDebit {
             ':amount' => $body['amount']
         );
         
-        $sql = 'UPDATE wallet_balances
-                SET total = total + :amount
-                WHERE uid = :uid
-                AND assetid = :assetid
-                RETURNING 1';
+        $sql = 'INSERT INTO wallet_balances(
+                    uid,
+                    assetid,
+                    total
+                ) VALUES(
+                    :uid,
+                    :assetid,
+                    :amount
+                )
+                ON CONFLICT(uid, assetid) DO UPDATE
+                SET total = total + EXCLUDED.total';
         
         $q = $this -> pdo -> prepare($sql);
         $q -> execute($task);
-        $row = $q -> fetch();
-            
-        if(!$row) {
-            $sql = 'INSERT INTO wallet_balances(
-                        uid,
-                        assetid,
-                        total
-                    )
-                    VALUES(
-                        :uid,
-                        :assetid,
-                        :amount
-                    )';
-            
-            $q = $this -> pdo -> prepare($sql);
-            $q -> execute($task);
-        }
         
         $this -> wlog -> insert(
             $this -> pdo,

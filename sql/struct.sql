@@ -20,6 +20,7 @@ create table wallet_balances(
     total decimal(65,32) not null,
     locked decimal(65,32) not null default 0,
     
+    unique(uid, assetid),
     foreign key(assetid) references assets(assetid)
 );
 
